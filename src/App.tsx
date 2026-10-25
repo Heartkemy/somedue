@@ -1,3 +1,4 @@
+import { Input, Textarea, Kbd, SectionHeading } from "./ui";
 import {
   createSignal,
   createMemo,
@@ -14,7 +15,6 @@ import { Dynamic, Portal } from "solid-js/web";
 import TagPicker from "./TagPicker";
 import DatePicker from "./DatePicker";
 import { Popover } from "./Popover";
-import "./editor.css";
 import { listen } from "@tauri-apps/api/event";
 import {
   Inbox,
@@ -992,18 +992,21 @@ export default function App() {
   return (
     <FeedbackContext.Provider value={error}>
       <div
-        class="app"
+        class="app grid h-dvh grid-rows-[--spacing(11)_minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
+        classList={{
+          "grid-cols-1": !sidebar(),
+          "grid-cols-[var(--sidebar-width)_minmax(0,1fr)]": sidebar(),
+        }}
         style={{
-          "grid-template-columns": sidebar()
-            ? `${sidebarWidth()}px minmax(0, 1fr)`
-            : "minmax(0, 1fr)",
+          // The user can resize the sidebar continuously; only this measured width is dynamic.
+          "--sidebar-width": `${sidebarWidth()}px`,
         }}
         data-theme={pref("theme", "dark")}
         data-density={pref("density", "comfortable")}
         data-motion={pref("motion", true) ? "on" : "off"}
       >
         <div
-          class="titlebar"
+          class="titlebar col-span-full row-start-1 z-2 flex h-8 items-center justify-end self-start pl-22 text-xs tracking-wide text-quiet select-none"
           style={{
             "padding-right": `calc(100% - ${sidebar() ? sidebarWidth() : 136}px + 8px)`,
           }}
@@ -1021,9 +1024,12 @@ export default function App() {
           </IconButton>
         </div>
         <Show when={sidebar()}>
-          <aside class="sidebar" inert={connectionOpen()}>
+          <aside
+            class="sidebar relative col-start-1 row-span-full row-start-1 flex min-h-0 min-w-0 flex-col bg-linear-to-b from-sidebar-start to-sidebar-end pt-11"
+            inert={connectionOpen()}
+          >
             <div
-              class="sidebar-resizer"
+              class="sidebar-resizer absolute inset-y-0 -right-1 z-5 w-2 cursor-col-resize touch-none focus-visible:ring-0 focus-visible:ring-offset-0 after:absolute after:top-[45%] after:right-0.5 after:h-6 after:w-0.5 after:rounded after:bg-quiet after:opacity-0 after:content-[''] hover:after:opacity-65 focus-visible:after:opacity-65 focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-mint"
               role="separator"
               aria-label="Sidebar width"
               aria-orientation="vertical"
@@ -1048,7 +1054,7 @@ export default function App() {
                 }
               }}
             />
-            <div class="sidebar-body">
+            <div class="sidebar-body min-h-0 flex-1 overflow-auto overscroll-contain px-2 pb-3 [scrollbar-gutter:stable]">
               <nav aria-label="Lists">
                 <For each={lists}>
                   {(name, i) => {
@@ -1056,7 +1062,7 @@ export default function App() {
                     return (
                       <Button
                         variant="bare"
-                        class="nav-item sidebar-item"
+                        class="nav-item sidebar-item [&:nth-child(2)]:mt-3.5 [&:nth-child(6)]:mt-3.5 grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink"
                         classList={{ active: list() === name && !query() }}
                         onClick={() => navigate(name)}
                         onDragOver={(e) => e.preventDefault()}
@@ -1081,15 +1087,32 @@ export default function App() {
                           }
                         }}
                       >
-                        <Icon size={18} />
-                        <span class="sidebar-label">{name}</span>
+                        <Icon
+                          size={18}
+                          class={
+                            list() === name && !query()
+                              ? "text-accent"
+                              : [
+                                  "text-quiet",
+                                  "text-accent",
+                                  "text-upcoming",
+                                  "text-anytime",
+                                  "text-someday",
+                                  "text-quiet",
+                                  "text-quiet",
+                                ][i()]
+                          }
+                        />
+                        <span class="sidebar-label block min-w-0 truncate">
+                          {name}
+                        </span>
                         <Show
                           when={
                             ["Inbox", "Today"].includes(name) &&
                             visible(all(), name).length
                           }
                         >
-                          <span class="count">
+                          <span class="count ml-auto font-mono text-xs text-quiet">
                             {visible(all(), name).length}
                           </span>
                         </Show>
@@ -1098,7 +1121,7 @@ export default function App() {
                   }}
                 </For>
               </nav>
-              <div class="containers">
+              <div class="containers mt-4 min-w-0 [&>.area-group:not(:first-child)]:mt-4.5">
                 <For each={projects().filter((e) => !refs(e, "ar").length)}>
                   {(p) => <ProjectNav p={p} />}
                 </For>
@@ -1112,7 +1135,7 @@ export default function App() {
                       }
                     >
                       <div
-                        class="area-row"
+                        class="area-row group/area relative"
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                           e.stopPropagation();
@@ -1121,7 +1144,7 @@ export default function App() {
                       >
                         <Button
                           variant="bare"
-                          class="area-toggle"
+                          class="area-toggle absolute top-0 right-2 z-1 size-7 min-h-7 rounded p-1.5 text-quiet opacity-0 group-hover/area:opacity-100 keyboard-input:group-focus-within/area:opacity-100 hover:bg-transparent hover:text-ink"
                           aria-label={`${collapsed().includes(a.id) ? "Expand" : "Collapse"} ${title(a)}`}
                           aria-expanded={!collapsed().includes(a.id)}
                           onClick={() =>
@@ -1140,7 +1163,7 @@ export default function App() {
                         </Button>
                         <Button
                           variant="bare"
-                          class="sidebar-item area-link"
+                          class="sidebar-item area-link grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink pr-9 font-semibold [&>svg]:text-mint group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection"
                           classList={{ active: list() === a.id }}
                           onClick={() => navigate(a.id)}
                           onDragOver={(e) => e.preventDefault()}
@@ -1151,7 +1174,9 @@ export default function App() {
                           ) : (
                             <Box size={16} />
                           )}
-                          <span class="sidebar-label">{title(a)}</span>
+                          <span class="sidebar-label block min-w-0 truncate">
+                            {title(a)}
+                          </span>
                         </Button>
                       </div>
                       <Show when={!collapsed().includes(a.id)}>
@@ -1167,7 +1192,7 @@ export default function App() {
                   )}
                 </For>
                 <Show when={!areas().length && !projects().length}>
-                  <p class="sidebar-hint">
+                  <p class="sidebar-hint p-3.5 text-xs leading-relaxed text-quiet [&>button]:mt-1.5 [&>button]:text-xs [&>button]:text-muted">
                     Make room for what matters.
                     <br />
                     <Button size="small" onClick={() => beginCreate("Area")}>
@@ -1177,10 +1202,10 @@ export default function App() {
                 </Show>
               </div>
             </div>
-            <div class="sidebar-bottom">
+            <div class="sidebar-bottom flex h-12 min-h-12 shrink-0 items-center gap-1 border-t border-hover px-2">
               <Button
                 variant="bare"
-                class="sidebar-new-list"
+                class="sidebar-new-list min-w-0 gap-1 rounded-full px-1 py-1.5 text-xs text-muted"
                 aria-label="New project or area"
                 onClick={() => beginCreate("Project")}
               >
@@ -1189,7 +1214,7 @@ export default function App() {
               </Button>
               <Button
                 variant="bare"
-                class="sync-status"
+                class="sync-status ml-auto h-7 min-h-7 w-6 min-w-6 rounded-full p-1"
                 onClick={() =>
                   state().account === "local"
                     ? (setSettingsTab("Things Cloud"), openSettings())
@@ -1202,13 +1227,13 @@ export default function App() {
                 }
               >
                 <span
-                  class="status-dot"
+                  class="status-dot size-1.5 rounded-full bg-quiet [&.connected]:bg-mint [&.pending]:bg-accent"
                   classList={{
                     connected: state().account !== "local",
                     pending: !!state().pending,
                   }}
                 />
-                <span class="sidebar-status-text">
+                <span class="sidebar-status-text sr-only">
                   {busy()
                     ? "Syncing…"
                     : state().pending
@@ -1218,15 +1243,22 @@ export default function App() {
                         : "Up to date"}
                 </span>
               </Button>
-              <IconButton aria-label="Settings" onClick={() => openSettings()}>
+              <IconButton
+                size="small"
+                aria-label="Settings"
+                onClick={() => openSettings()}
+              >
                 <Settings size={17} />
               </IconButton>
             </div>
           </aside>
         </Show>
-        <main inert={connectionOpen()}>
+        <main
+          class="relative isolate z-3 flex min-h-0 min-w-0 flex-col"
+          inert={connectionOpen()}
+        >
           <svg
-            class="workspace-curves"
+            class="workspace-curves pointer-events-none absolute -top-11 right-0 -z-1 h-56 w-7/8 opacity-30"
             viewBox="0 0 1000 220"
             preserveAspectRatio="none"
             fill="none"
@@ -1248,18 +1280,18 @@ export default function App() {
               stroke-width=".45"
             />
           </svg>
-          <div class="top-tools">
+          <div class="top-tools absolute -top-11 right-0 z-10 flex h-8 shrink-0 items-center justify-end gap-2 px-7">
             <IconButton
               size="compact"
               variant="quiet"
-              class="search-box"
+              class="search-box text-quiet has-focus-visible:ring-2 has-focus-visible:ring-mint has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-bg"
               aria-label="Search all items"
               title="Quick Find (⌘ F)"
               onClick={() => openFind()}
             >
               <Search size={16} />
             </IconButton>
-            <div class="toolbar-actions">
+            <div class="toolbar-actions flex gap-2 text-muted">
               <IconButton
                 size="compact"
                 variant="quiet"
@@ -1268,7 +1300,7 @@ export default function App() {
                 onClick={() => void refresh()}
                 disabled={busy()}
               >
-                <RefreshCw size={16} classList={{ spin: busy() }} />
+                <RefreshCw size={16} classList={{ "animate-spin": busy() }} />
               </IconButton>
               <IconButton
                 size="compact"
@@ -1291,7 +1323,7 @@ export default function App() {
             </div>
             <Show when={menu()}>
               <Menu
-                class="popover list-menu floating-surface"
+                class="popover list-menu floating-surface absolute top-8.5 right-7 z-20 max-h-[calc(100dvh_-_--spacing(20))] w-72 max-w-[calc(100vw_-_--spacing(6))] overflow-y-auto rounded-2xl bg-surface/65 p-2 text-ink shadow-2xl backdrop-blur-xl [&>hr]:mx-2 [&>hr]:my-1 [&>hr]:border-0 [&>hr]:border-t [&>hr]:border-hover"
                 aria-label="List actions"
                 close={() => {
                   setMenu(false);
@@ -1302,9 +1334,9 @@ export default function App() {
                     ?.focus();
                 }}
               >
-                <div class="menu-connection">
+                <div class="menu-connection grid grid-cols-[--spacing(3.5)_1fr] items-center gap-2 px-3 pt-2.5 pb-3 [&>strong]:text-xs [&>strong]:font-medium [&>span:last-child]:col-start-2 [&>span:last-child]:text-xs [&>span:last-child]:leading-5 [&>span:last-child]:text-muted">
                   <span
-                    class="menu-status-mark"
+                    class="menu-status-mark size-1.5 rounded-full bg-mint ring-4 ring-mint/15 [&.pending]:bg-accent [&.blocked]:bg-danger"
                     classList={{
                       pending: busy() || !!state().pending,
                       blocked: state().blocked,
@@ -1333,7 +1365,7 @@ export default function App() {
                     setMenu(false);
                   }}
                 >
-                  <Plus size={16} /> New To-Do <kbd>⌘ N</kbd>
+                  <Plus size={16} /> New To-Do <Kbd>⌘ N</Kbd>
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -1416,19 +1448,22 @@ export default function App() {
                     setMenu(false);
                   }}
                 >
-                  <Settings size={16} /> Settings… <kbd>⌘ ,</kbd>
+                  <Settings size={16} /> Settings… <Kbd>⌘ ,</Kbd>
                 </MenuItem>
               </Menu>
             </Show>
           </div>
           <Show when={!native()}>
-            <div class="preview-note">
+            <div class="preview-note bg-surface px-7 py-2 text-xs text-quiet">
               Visual preview · Open the installed app to save tasks and connect
               Things Cloud.
             </div>
           </Show>
           <Show when={error()}>
-            <div role="alert" class="notice error">
+            <div
+              role="alert"
+              class="notice error mx-6 mb-2.5 flex items-start justify-between rounded-lg px-4 py-3 text-xs leading-relaxed bg-danger/10 text-danger"
+            >
               <span>{error()}</span>
               <IconButton
                 aria-label="Dismiss error"
@@ -1438,10 +1473,13 @@ export default function App() {
               </IconButton>
             </div>
           </Show>
-          <section class="list-page" data-list={list()}>
-            <header class="page-header">
-              <div class="heading-line">
-                <span class="page-symbol">
+          <section
+            class="list-page relative min-h-0 flex-1 overflow-auto scroll-smooth px-11 pt-5 pb-9 max-lg:px-7 max-lg:pb-8 data-[list=Logbook]:[&_.list-group-heading]:mt-6 data-[list=Logbook]:[&_.list-group-heading]:border-b data-[list=Logbook]:[&_.list-group-heading]:border-hover data-[list=Logbook]:[&_.list-group-heading]:pb-2.5 data-[list=Logbook]:[&_.list-group-heading]:text-sm data-[list=Logbook]:[&_.list-group-heading]:font-semibold data-[list=Logbook]:[&_.list-group-heading]:text-ink"
+            data-list={list()}
+          >
+            <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
+              <div class="heading-line flex items-baseline gap-3">
+                <span class="page-symbol flex size-7 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
                   {list() === "Inbox" ? (
                     <Inbox />
                   ) : list() === "Today" ? (
@@ -1458,7 +1496,7 @@ export default function App() {
                     <Layers />
                   )}
                 </span>
-                <h1>
+                <h1 class="min-w-0 font-serif text-4xl leading-tight font-medium tracking-tight wrap-anywhere [&_[data-motion-word]]:inline-block">
                   <For
                     each={(query()
                       ? "Search results"
@@ -1477,8 +1515,9 @@ export default function App() {
                 </h1>
               </div>
               <Show when={current() && isProject(current()!)}>
-                <textarea
-                  class="project-notes"
+                <Textarea
+                  variant="plain"
+                  class="project-notes mt-3 block min-h-8 w-full resize-y px-0 py-1 text-sm leading-relaxed text-muted"
                   rows="1"
                   aria-label="Project notes"
                   placeholder="Add notes to this project…"
@@ -1488,9 +1527,9 @@ export default function App() {
                   }
                 />
               </Show>
-              <div class="header-controls">
+              <div class="header-controls mt-3 flex items-start gap-2.5 empty:hidden">
                 <Show when={current()}>
-                  <div class="list-tag-editor">
+                  <div class="list-tag-editor shrink-0">
                     <TagPicker
                       label="List tags"
                       compact
@@ -1502,7 +1541,7 @@ export default function App() {
                   </div>
                 </Show>
                 <Show when={filterTags().length}>
-                  <div class="tag-filters">
+                  <div class="tag-filters flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 [&>button]:min-h-7 [&>button]:rounded-none [&>button]:bg-transparent [&>button]:px-0 [&>button]:py-1 [&>button]:text-xs [&>button]:font-normal [&>button]:text-quiet [&>button.selected]:text-mint">
                     <Button
                       variant="bare"
                       classList={{ selected: !tag() }}
@@ -1524,13 +1563,16 @@ export default function App() {
                   </div>
                 </Show>
               </div>
-              <div class="page-divider" aria-hidden="true" />
+              <div
+                class="page-divider absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-highlight/40 via-orchid/15 via-20% to-transparent"
+                aria-hidden="true"
+              />
             </header>
             <Show
               when={!loading()}
               fallback={
-                <div class="empty">
-                  <span class="loader" />
+                <div class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed">
+                  <span class="loader m-5 size-5 animate-spin rounded-full border-2 border-quiet border-t-accent" />
                   Opening your workspace…
                 </div>
               }
@@ -1539,7 +1581,7 @@ export default function App() {
                 when={items().length}
                 fallback={
                   <div
-                    class="empty"
+                    class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
                     classList={{ "symbol-only": !query() }}
                     role="status"
                     aria-label={
@@ -1548,7 +1590,7 @@ export default function App() {
                         : `${current() ? title(current()!) : list()} is empty`
                     }
                   >
-                    <div class="empty-symbol">
+                    <div class="empty-symbol mb-3 grid size-16 place-items-center rounded-full text-mint opacity-75 [&>svg]:stroke-1">
                       <Dynamic
                         component={
                           query()
@@ -1594,7 +1636,7 @@ export default function App() {
                               )
                           }
                         >
-                          <div class="list-group-heading">
+                          <div class="list-group-heading my-1 flex items-center gap-2 py-1 pt-2 text-xs leading-4 font-medium text-mint first:mt-0 first:pt-0">
                             {group(item) === "This Evening" && (
                               <Moon size={16} />
                             )}
@@ -1608,7 +1650,7 @@ export default function App() {
                               id={"item-" + item.id}
                               role="listitem"
                               tabindex="0"
-                              class="task-row"
+                              class="task-row group/task relative grid min-h-9 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 rounded-lg px-0 py-1 outline-none transition-colors hover:bg-hover compact:min-h-8 [&.selected]:bg-linear-to-br [&.selected]:from-mint/5 [&.selected]:to-selection [&.project-row]:hover:bg-linear-to-br [&.project-row]:hover:from-mint/5 [&.project-row]:hover:to-selection [&.logged]:grid-cols-[--spacing(7)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-5.5 [&.heading]:mb-1.5 [&.heading]:flex [&.heading]:border-0 [&.heading]:p-0 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-0 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
                               classList={{
                                 selected: selected() === item.id,
                                 completed: item.props.ss === 3,
@@ -1686,7 +1728,7 @@ export default function App() {
                               <Show when={!isHeading(item)}>
                                 <Button
                                   variant="bare"
-                                  class="task-check"
+                                  class="task-check size-4 min-h-4 shrink-0 justify-self-center rounded border border-quiet p-0 text-accent transition-colors hover:border-accent hover:bg-selection [&.project]:size-4.5 [&.project]:rounded-full [&.project]:border-0 group-[.later]/task:border-dashed group-[.completed]/task:border-mint group-[.completed]/task:bg-mint group-[.completed]/task:text-bg group-[.cancelled]/task:border-quiet group-[.cancelled]/task:bg-transparent group-[.cancelled]/task:text-quiet aria-pressed:border-mint aria-pressed:bg-mint aria-pressed:text-bg"
                                   classList={{ project: isProject(item) }}
                                   aria-label={`${item.props.ss ? "Reopen" : "Complete"} ${title(item)}`}
                                   onClick={(e) => {
@@ -1707,7 +1749,7 @@ export default function App() {
                               </Show>
                               <Show when={item.props.ss}>
                                 <span
-                                  class="logged-date"
+                                  class="logged-date text-xs font-medium whitespace-nowrap text-accent tabular-nums"
                                   title={
                                     item.props.ss === 2
                                       ? "Cancelled"
@@ -1724,25 +1766,25 @@ export default function App() {
                                     : "Date unavailable"}
                                 </span>
                               </Show>
-                              <div class="task-content">
-                                <div class="task-summary">
-                                  <span class="task-title">
+                              <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1">
+                                <div class="task-summary flex min-w-0 items-center gap-2">
+                                  <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">
                                     {editorSaves.drafts
                                       .get(item.id)
                                       ?.read()
                                       .name.trim() || title(item)}
                                   </span>
                                   <Show when={isProject(item)}>
-                                    <span class="project-task-count">
+                                    <span class="project-task-count ml-1 text-xs leading-5 text-muted">
                                       {item.props.ss
                                         ? projectStats(item, all()).total
                                         : projectStats(item, all()).remaining}
                                     </span>
                                   </Show>
-                                  <div class="task-meta">
+                                  <div class="task-meta flex min-w-0 max-w-70 shrink-0 items-center gap-2 text-xs text-quiet max-lg:max-w-36 max-lg:gap-1.5">
                                     <For each={refs(item, "tg")}>
                                       {(id) => (
-                                        <span class="row-tag">
+                                        <span class="row-tag max-w-24 truncate rounded-full bg-ink/7 px-1.5 text-xs text-muted max-lg:max-w-16">
                                           {title(
                                             tags().find((t) => t.id === id) || {
                                               id,
@@ -1769,7 +1811,7 @@ export default function App() {
                                         refs(e, "ts").includes(item.id),
                                       )}
                                     >
-                                      <span class="checklist-count">
+                                      <span class="checklist-count font-mono text-xs">
                                         {
                                           all().filter(
                                             (e) =>
@@ -1787,7 +1829,7 @@ export default function App() {
                                     </Show>
                                     <Show when={item.props.dd}>
                                       <span
-                                        class="deadline"
+                                        class="deadline flex items-center gap-1 whitespace-nowrap text-deadline [&.overdue]:text-danger"
                                         classList={{
                                           overdue: item.props.dd < today(),
                                         }}
@@ -1807,12 +1849,14 @@ export default function App() {
                                     >
                                       <div
                                         data-row-control
-                                        class="row-schedule"
+                                        class="row-schedule opacity-0 group-hover/task:opacity-100 group-focus-within/task:opacity-100 group-[.later]/task:opacity-100"
                                         onClick={(e) => e.stopPropagation()}
                                         role="group"
                                         aria-label={`Schedule ${title(item)}`}
                                       >
                                         <DatePicker
+                                          compact
+                                          iconOnly
                                           kind="when"
                                           reminder={
                                             pref("reminders", {})[
@@ -1857,7 +1901,7 @@ export default function App() {
                                 <Show
                                   when={!current() && container(item, all())}
                                 >
-                                  <span class="container-label">
+                                  <span class="container-label max-w-full truncate text-xs leading-4 text-quiet">
                                     {container(item, all())}
                                   </span>
                                 </Show>
@@ -1882,14 +1926,14 @@ export default function App() {
               <ListVisibility />
             </Show>
           </section>
-          <footer class="list-footer">
-            <div ref={setEditorFooter} class="editor-footer-slot" />
+          <footer class="list-footer relative order-2 flex h-12 shrink-0 items-center justify-center gap-3 border-t border-hover px-4 text-xs text-quiet">
+            <div ref={setEditorFooter} class="editor-footer-slot contents" />
             <Show when={!editing() || !editorActions()}>
-              <div class="footer-actions">
+              <div class="footer-actions grid grid-cols-4 items-center justify-items-center gap-3 [&>*]:w-16 [&>button]:w-7">
                 <IconButton
                   size="compact"
                   variant="quiet"
-                  class="footer-add"
+                  class="footer-add text-accent"
                   aria-label="New to-do"
                   title="New to-do (⌘ N)"
                   onClick={() => beginCreate("To-Do")}
@@ -1918,6 +1962,7 @@ export default function App() {
                     }
                   >
                     <DatePicker
+                      iconOnly
                       compact
                       kind="when"
                       value={date(chosen()?.props.sr || chosen()?.props.tir)}
@@ -1958,7 +2003,7 @@ export default function App() {
                 </IconButton>
               </div>
               <Show when={chosen()}>
-                <div class="footer-selection-actions">
+                <div class="footer-selection-actions absolute right-3.5 flex gap-1">
                   <IconButton
                     size="compact"
                     variant="quiet"
@@ -1983,7 +2028,7 @@ export default function App() {
                 <Button
                   size="compact"
                   variant="quiet"
-                  class="footer-undo"
+                  class="footer-undo absolute left-3"
                   onClick={() =>
                     void run(async () => {
                       await mutate(undo()!, true, false);
@@ -1999,7 +2044,7 @@ export default function App() {
           <Show when={notice()}>
             <div
               role="status"
-              class="toast floating-surface"
+              class="toast floating-surface z-100 order-1 mx-6 mb-3 flex w-95 max-w-[calc(100%_-_--spacing(8))] shrink-0 items-start gap-3 self-end rounded-xl bg-ink/7 p-4 text-sm leading-relaxed text-ink shadow-xl backdrop-blur-xl [&>p]:min-w-0 [&>p]:flex-1 [&>p]:pt-0.5 [&>p]:wrap-anywhere [&_svg]:text-mint [&_.icon-button_svg]:text-muted"
               onMouseEnter={pauseNotice}
               onMouseLeave={resumeNotice}
               onFocusIn={pauseNotice}
@@ -2008,7 +2053,7 @@ export default function App() {
                   resumeNotice();
               }}
             >
-              <span class="toast-mark">
+              <span class="toast-mark grid size-7 shrink-0 place-items-center">
                 <Check size={18} />
               </span>
               <p>{notice()}</p>
@@ -2034,7 +2079,7 @@ export default function App() {
         </Show>
         <Show when={moving() && chosen()}>
           <Dialog title="Move to…" close={() => setMoving(false)}>
-            <div class="destination-list">
+            <div class="destination-list flex max-h-[50dvh] flex-col overflow-auto [&>button]:justify-start [&>button]:p-3 [&>button]:text-muted [&_small]:ml-auto [&_small]:text-quiet">
               <Button
                 onClick={() =>
                   void run(async () => {
@@ -2099,13 +2144,15 @@ export default function App() {
               if (!confirming()) setConfirm(null);
             }}
           >
-            <p class="confirm-text">{confirm()!.text}</p>
-            <div class="dialog-actions">
+            <p class="confirm-text text-sm leading-relaxed text-muted">
+              {confirm()!.text}
+            </p>
+            <div class="dialog-actions -mx-1 mt-6 flex flex-wrap justify-end gap-2 p-1">
               <Button disabled={confirming()} onClick={() => setConfirm(null)}>
                 Cancel
               </Button>
               <Button
-                class="danger"
+                class="danger bg-danger/10 text-danger"
                 disabled={confirming()}
                 onClick={() => {
                   if (confirming()) return;
@@ -2153,7 +2200,7 @@ export default function App() {
     return (
       <Button
         variant="bare"
-        class="project-nav sidebar-item"
+        class="project-nav sidebar-item grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink"
         draggable="true"
         onDragStart={(e) => {
           e.stopPropagation();
@@ -2165,7 +2212,9 @@ export default function App() {
         onDrop={(e) => dropIn(e, props.p)}
       >
         <ProjectProgress project={props.p} />
-        <span class="sidebar-label">{title(props.p)}</span>
+        <span class="sidebar-label block min-w-0 truncate">
+          {title(props.p)}
+        </span>
       </Button>
     );
   }
@@ -2176,7 +2225,7 @@ export default function App() {
     };
     return (
       <svg
-        class="project-ring"
+        class="project-ring inline-block size-4 shrink-0 overflow-visible border-0 text-accent"
         viewBox="0 0 20 20"
         role="img"
         aria-label={`${Math.round(ratio() * 100)}% complete`}
@@ -2202,7 +2251,7 @@ export default function App() {
       visible(all(), list(), "", "", true).filter((item) => !!item.props.ss)
         .length;
     return (
-      <div class="list-visibility">
+      <div class="list-visibility mt-7 flex flex-col items-start gap-2 border-t border-hover pt-3 [&>button]:min-h-7 [&>button]:text-xs [&>button]:text-muted">
         <Button
           variant="quiet"
           aria-pressed={!showLater()}
@@ -2266,8 +2315,9 @@ export default function App() {
       }
     });
     return (
-      <div class="heading inline-heading-editor">
-        <input
+      <div class="heading inline-heading-editor mt-6 mb-2 flex min-h-8 items-center gap-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:font-semibold [&>input]:text-accent">
+        <Input
+          variant="plain"
           ref={input}
           aria-label="Heading title"
           value={name()}
@@ -2404,9 +2454,9 @@ export default function App() {
             }
           }}
         >
-          <div class="find-input">
+          <div class="find-input flex items-center gap-2.5 text-muted">
             <Search size={18} />
-            <input
+            <Input
               ref={input}
               aria-label="Quick Find query"
               role="combobox"
@@ -2426,7 +2476,7 @@ export default function App() {
           </div>
           <div
             id="find-results"
-            class="find-results"
+            class="find-results -mx-1 my-3.5 max-h-[50dvh] overflow-auto p-1 [&>button]:min-h-10 [&>button]:w-full [&>button]:justify-start [&>button]:gap-2 [&>button]:rounded-lg [&>button]:px-2.5 [&>button]:py-1.5 [&>button]:text-left [&>button>span]:min-w-0 [&>button>span]:truncate [&>button>svg]:shrink-0 [&>button>svg]:text-accent [&_small]:ml-auto [&_small]:max-w-30 [&_small]:truncate [&_small]:text-muted [&_.find-active]:bg-selection"
             role="listbox"
             aria-label="Quick Find results"
           >
@@ -2451,9 +2501,9 @@ export default function App() {
             </For>
           </div>
           <Show when={!entries().length}>
-            <p class="muted">No matching lists or to-dos.</p>
+            <p class="muted text-muted">No matching lists or to-dos.</p>
           </Show>
-          <p class="find-hint">
+          <p class="find-hint pt-2 text-xs text-quiet">
             ↑ ↓ to choose · Return to open · Escape to close
           </p>
         </div>
@@ -2528,7 +2578,7 @@ export default function App() {
       >
         <form onSubmit={submit}>
           <Field label="Title">
-            <input
+            <Input
               autofocus
               required
               value={name()}
@@ -2537,7 +2587,7 @@ export default function App() {
             />
           </Field>
           <Show when={kind() !== "Rename"}>
-            <div class="field-grid">
+            <div class="field-grid grid grid-cols-2 gap-4 [&>*]:min-w-0">
               <Field label="Kind">
                 <Select
                   value={kind()}
@@ -2574,7 +2624,7 @@ export default function App() {
               </Show>
             </div>
           </Show>
-          <div class="dialog-actions">
+          <div class="dialog-actions -mx-1 mt-6 flex flex-wrap justify-end gap-2 p-1">
             <Button onClick={() => beginCreate(null)}>Cancel</Button>
             <Button
               type="submit"
@@ -2897,7 +2947,7 @@ export default function App() {
     });
     return (
       <div
-        class="task-editor"
+        class="task-editor my-2.5 mb-4.5 flex flex-col gap-2 rounded-xl bg-linear-to-br from-editor-start to-editor-end px-4 py-3 shadow-xl outline-none max-sm:p-3 [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
         data-instant={instant || undefined}
         ref={editor}
         role="group"
@@ -2939,10 +2989,10 @@ export default function App() {
           }
         }}
       >
-        <div class="editor-title">
+        <div class="editor-title flex min-h-8 items-center gap-2.5 rounded-lg [&>input]:min-h-8 [&>input]:rounded-none [&>input]:px-0 [&>input]:py-1 [&>input]:text-base [&>input]:font-medium [&>input]:focus-visible:bg-transparent [&>input]:focus-visible:shadow-none">
           <Button
             variant="bare"
-            class="task-check"
+            class="task-check size-4 min-h-4 shrink-0 justify-self-center rounded border border-quiet p-0 text-accent transition-colors hover:border-accent hover:bg-selection [&.project]:size-4.5 [&.project]:rounded-full [&.project]:border-0 group-[.later]/task:border-dashed group-[.completed]/task:border-mint group-[.completed]/task:bg-mint group-[.completed]/task:text-bg group-[.cancelled]/task:border-quiet group-[.cancelled]/task:bg-transparent group-[.cancelled]/task:text-quiet aria-pressed:border-mint aria-pressed:bg-mint aria-pressed:text-bg"
             aria-label={status() ? "Reopen to-do" : "Complete to-do"}
             aria-pressed={!!status()}
             onClick={(e) => setStatus(status() ? 0 : e.altKey ? 2 : 3)}
@@ -2951,7 +3001,8 @@ export default function App() {
               <Check size={13} />
             </Show>
           </Button>
-          <input
+          <Input
+            variant="plain"
             autofocus
             aria-label="To-do title"
             value={name()}
@@ -2959,12 +3010,13 @@ export default function App() {
             placeholder="New to-do"
           />
         </div>
-        <div class="editor-notes-block">
+        <div class="editor-notes-block ml-7 min-w-0">
           <Show
             when={previewNotes()}
             fallback={
-              <textarea
-                class="editor-notes"
+              <Textarea
+                variant="plain"
+                class="editor-notes min-h-14 w-full rounded-lg px-0 py-1 text-sm leading-relaxed text-muted"
                 aria-label="Notes"
                 placeholder="Notes"
                 value={notes()}
@@ -2975,10 +3027,16 @@ export default function App() {
             <Markdown text={notes()} onError={setError} />
           </Show>
         </div>
-        <div class="checklist" hidden={!checks().length}>
+        <div
+          class="checklist ml-7 flex flex-col gap-1.5"
+          hidden={!checks().length}
+        >
           <For each={checks()}>
             {(c) => (
-              <div class="check-row" data-check-id={c.id}>
+              <div
+                class="check-row flex min-w-0 items-center gap-2.5 px-0.5 [&>input:not([type=checkbox])]:min-h-9 [&>input:not([type=checkbox])]:flex-1 [&>input:not([type=checkbox])]:rounded-lg [&>input:not([type=checkbox])]:px-2.5 [&>input:not([type=checkbox])]:py-2 [&>input:not([type=checkbox])]:text-sm [&>input:checked+input]:text-quiet [&>input:checked+input]:line-through"
+                data-check-id={c.id}
+              >
                 <Checkbox
                   aria-label={`Complete checklist ${c.title}`}
                   type="checkbox"
@@ -2993,7 +3051,8 @@ export default function App() {
                     )
                   }
                 />
-                <input
+                <Input
+                  variant="plain"
                   aria-label="Checklist item"
                   value={c.title}
                   placeholder="Checklist item"
@@ -3057,14 +3116,14 @@ export default function App() {
           <Button
             size="small"
             variant="quiet"
-            class="add-check"
+            class="add-check self-start px-3 py-1.5"
             onClick={() => addCheck()}
           >
             <Plus size={13} />
             Checklist item
           </Button>
         </div>
-        <div class="editor-tools">
+        <div class="editor-tools mt-1.5 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.date-picker:first-child]:mr-auto">
           <DatePicker
             compact
             kind="when"
@@ -3101,8 +3160,8 @@ export default function App() {
           />
         </div>
         <Show when={!item.props.rp && (repeatOpen() || recurring())}>
-          <div class="repeat-panel">
-            <span class="muted">Repeat</span>
+          <div class="repeat-panel px-7 py-2.5 [&_.field]:my-2">
+            <span class="muted text-muted">Repeat</span>
             <Field label="Frequency">
               <Select
                 value={repeat()}
@@ -3117,7 +3176,7 @@ export default function App() {
             </Field>
             <Show when={repeat()}>
               <Field label="Every">
-                <input
+                <Input
                   type="number"
                   min="1"
                   max="99"
@@ -3132,12 +3191,12 @@ export default function App() {
                   }
                 />
               </Field>
-              <p class="muted">
+              <p class="muted text-muted">
                 Future copies require Things on a connected device.
               </p>
             </Show>
             <Show when={recurring()}>
-              <p class="muted">
+              <p class="muted text-muted">
                 This copy belongs to an existing repeating schedule.
               </p>
               <Button
@@ -3166,7 +3225,7 @@ export default function App() {
         <Show when={editorFooter()}>
           {(mount) => (
             <Portal mount={mount()}>
-              <div class="editor-footer">
+              <div class="editor-footer flex flex-wrap items-center justify-center gap-12">
                 <Popover
                   size="compact"
                   iconOnly
@@ -3176,7 +3235,7 @@ export default function App() {
                 >
                   {(close) => (
                     <>
-                      <div class="destination-list">
+                      <div class="destination-list flex max-h-[50dvh] flex-col overflow-auto [&>button]:justify-start [&>button]:p-3 [&>button]:text-muted [&_small]:ml-auto [&_small]:text-quiet">
                         <Button
                           onClick={() => {
                             setDestination("");
@@ -3249,7 +3308,7 @@ export default function App() {
                           void save();
                         }}
                       >
-                        Save edits <kbd>⌘ ↵</kbd>
+                        Save edits <Kbd>⌘ ↵</Kbd>
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
@@ -3257,7 +3316,7 @@ export default function App() {
                           discardEditor();
                         }}
                       >
-                        Discard edits <kbd>Esc</kbd>
+                        Discard edits <Kbd>Esc</Kbd>
                       </MenuItem>
                       <MenuItem
                         onClick={() => {
@@ -3341,7 +3400,7 @@ export default function App() {
                     Restore
                   </Button>
                   <Button
-                    class="danger subtle"
+                    class="danger subtle bg-danger/10 text-danger bg-transparent"
                     onClick={() =>
                       ask(
                         "Permanently delete this item and everything inside it? This cannot be undone.",
@@ -3394,7 +3453,7 @@ export default function App() {
         }}
         wide
       >
-        <div class="settings-layout">
+        <div class="settings-layout grid min-h-96 grid-cols-[--spacing(36)_minmax(0,1fr)] gap-6 max-lg:grid-cols-[--spacing(32)_minmax(0,1fr)] max-lg:gap-4 max-sm:grid-cols-1 [&>nav]:sticky [&>nav]:top-0 [&>nav]:flex [&>nav]:flex-col [&>nav]:gap-1 [&>nav]:self-start max-sm:[&>nav]:flex-row max-sm:[&>nav]:flex-wrap [&>nav>button]:justify-start [&>nav>button]:rounded-lg [&>nav>button]:px-3 [&>nav>button]:py-2.5 [&>nav>button]:text-xs [&>nav>button]:text-quiet [&>nav>button.active]:bg-selection [&>nav>button.active]:text-accent">
           <nav aria-label="Settings categories">
             <For
               each={[
@@ -3417,10 +3476,12 @@ export default function App() {
               )}
             </For>
           </nav>
-          <div class="settings-content">
+          <div class="settings-content min-w-0 px-2 pt-2 pb-4 [&_p]:mb-3.5 [&_p]:text-xs [&_p]:leading-relaxed [&_form+p]:mt-4 [&_h4]:mb-2 [&_h4]:text-sm">
             <Show when={settingsTab() === "General"}>
-              <h3>Make space for your day.</h3>
-              <p class="muted">A few preferences to make Somedue your own.</p>
+              <SectionHeading>Make space for your day.</SectionHeading>
+              <p class="muted text-muted">
+                A few preferences to make Somedue your own.
+              </p>
               <Field label="New to-dos go to">
                 <Select
                   value={pref("defaultList", "Inbox")}
@@ -3432,7 +3493,7 @@ export default function App() {
                   <option>Today</option>
                 </Select>
               </Field>
-              <label class="check-label">
+              <label class="check-label my-4 flex cursor-pointer items-center gap-2 text-xs leading-relaxed">
                 <Checkbox
                   type="checkbox"
                   checked={pref("autoSync", true)}
@@ -3442,7 +3503,7 @@ export default function App() {
                 />
                 Sync automatically while the app is open
               </label>
-              <div class="settings-group">
+              <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
                 <h4>Quick Entry</h4>
                 <p>
                   Capture a thought from any app. Choose an unused shortcut,
@@ -3452,7 +3513,7 @@ export default function App() {
                   label="Global shortcut"
                   hint="Leave empty to turn it off."
                 >
-                  <input
+                  <Input
                     aria-label="Global shortcut"
                     placeholder="Control+Shift+Space"
                     value={shortcut()}
@@ -3460,11 +3521,14 @@ export default function App() {
                   />
                 </Field>
                 <Show when={state().shortcutError}>
-                  <p role="alert" class="error-text">
+                  <p
+                    role="alert"
+                    class="error-text mb-4 text-xs leading-relaxed text-danger"
+                  >
                     {state().shortcutError}
                   </p>
                 </Show>
-                <div class="quick-setting-actions">
+                <div class="quick-setting-actions mt-3 flex gap-2.5 [&>button]:bg-hover [&>button]:text-xs">
                   <Button
                     onClick={() =>
                       void run(async () => {
@@ -3483,7 +3547,7 @@ export default function App() {
                   </Button>
                 </div>
               </div>
-              <div class="settings-group">
+              <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
                 <h4>Your data</h4>
                 <p>
                   Local and cloud workspaces stay separate. Offline edits are
@@ -3496,7 +3560,7 @@ export default function App() {
               </div>
             </Show>
             <Show when={settingsTab() === "Appearance"}>
-              <h3>A quieter workspace.</h3>
+              <SectionHeading>A quieter workspace.</SectionHeading>
               <Field label="Color theme">
                 <Select
                   value={pref("theme", "dark")}
@@ -3519,7 +3583,7 @@ export default function App() {
                   <option value="compact">Compact</option>
                 </Select>
               </Field>
-              <label class="check-label">
+              <label class="check-label my-4 flex cursor-pointer items-center gap-2 text-xs leading-relaxed">
                 <Checkbox
                   type="checkbox"
                   checked={pref("motion", true)}
@@ -3529,18 +3593,20 @@ export default function App() {
                 />
                 Animate transitions
               </label>
-              <p class="muted">System Reduce Motion always takes precedence.</p>
+              <p class="muted text-muted">
+                System Reduce Motion always takes precedence.
+              </p>
             </Show>
             <Show when={settingsTab() === "Things Cloud"}>
-              <h3>Everything, together.</h3>
-              <p class="muted">
+              <SectionHeading>Everything, together.</SectionHeading>
+              <p class="muted text-muted">
                 Connect using your Things Cloud account. Your password is stored
                 only in macOS Keychain.
               </p>
               <Show
                 when={state().account === "local"}
                 fallback={
-                  <div class="account-card">
+                  <div class="account-card flex flex-col items-start gap-3 py-4 text-xs [&_svg]:text-mint [&>span]:text-xs [&>span]:text-muted [&>button]:text-accent">
                     <Cloud size={24} />
                     <strong>{state().account}</strong>
                     <span>
@@ -3578,13 +3644,13 @@ export default function App() {
                 >
                   Connect Things Cloud
                 </Button>
-                <p class="small muted connect-hint">
+                <p class="small muted connect-hint text-xs text-muted mt-4 max-w-prose">
                   Signing in opens your cloud workspace. Your local to-dos
                   remain saved separately.
                 </p>
               </Show>
               <Show when={state().blocked}>
-                <div class="settings-group">
+                <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
                   <h4>Sync recovery</h4>
                   <p>
                     A change may conflict with another device or have an
@@ -3613,9 +3679,9 @@ export default function App() {
               </Show>
             </Show>
             <Show when={settingsTab() === "Tags"}>
-              <h3>A place for every context.</h3>
+              <SectionHeading>A place for every context.</SectionHeading>
               <form
-                class="tag-create"
+                class="tag-create mb-2.5 flex items-center gap-2 [&>input]:w-0 [&>input]:flex-1 [&>input]:text-xs"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void run(async () => {
@@ -3627,7 +3693,7 @@ export default function App() {
                   });
                 }}
               >
-                <input
+                <Input
                   aria-label="New tag name"
                   placeholder="New tag"
                   value={newTag()}
@@ -3639,9 +3705,9 @@ export default function App() {
               </form>
               <For each={tags()}>
                 {(t) => (
-                  <div class="tag-setting">
+                  <div class="tag-setting mb-2.5 flex items-center gap-2 text-muted [&>input]:w-0 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:text-xs">
                     <Tag size={14} />
-                    <input
+                    <Input
                       aria-label={`Rename tag ${title(t)}`}
                       value={title(t)}
                       onChange={(e) =>
@@ -3678,8 +3744,8 @@ export default function App() {
               </For>
             </Show>
             <Show when={settingsTab() === "Keyboard"}>
-              <h3>Keep your hands on the keys.</h3>
-              <div class="shortcuts">
+              <SectionHeading>Keep your hands on the keys.</SectionHeading>
+              <div class="shortcuts [&>div]:flex [&>div]:items-center [&>div]:justify-between [&>div]:py-2 [&>div]:text-xs [&>div]:text-muted">
                 <For
                   each={[
                     ["New to-do", "⌘ N"],
@@ -3704,24 +3770,28 @@ export default function App() {
                   {(row) => (
                     <div>
                       <span>{row[0]}</span>
-                      <kbd>{row[1]}</kbd>
+                      <Kbd>{row[1]}</Kbd>
                     </div>
                   )}
                 </For>
               </div>
             </Show>
             <Show when={settingsTab() === "About"}>
-              <img class="about-mark" src={appIcon} alt="Somedue app icon" />
-              <h3>Somedue</h3>
+              <img
+                class="about-mark my-2.5 mb-5 grid size-16 place-items-center object-contain"
+                src={appIcon}
+                alt="Somedue app icon"
+              />
+              <SectionHeading>Somedue</SectionHeading>
               <p>A considered home for what comes next.</p>
-              <p class="muted">
+              <p class="muted text-muted">
                 Version 0.1.0
                 <br />
                 An independent Things Cloud client.
                 <br />
                 Not affiliated with Cultured Code.
               </p>
-              <p class="small muted">
+              <p class="small muted text-xs text-muted">
                 Local certificate signing. Not notarized.
                 <br />
                 Cloud protocol is unofficial. See the repository’s verification

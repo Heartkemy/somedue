@@ -49,7 +49,12 @@ test("source-backed headline and accelerating rows use one entry clock", async (
           ".project-notes,.header-controls,.page-divider,.list-visibility",
         ),
       ].map((element) => ({
-        className: element.className,
+        className: [
+          "project-notes",
+          "header-controls",
+          "page-divider",
+          "list-visibility",
+        ].find((name) => element.classList.contains(name)),
         animation: animation(element),
       })),
       rows: [...document.querySelectorAll(".task-row")].map(animation),

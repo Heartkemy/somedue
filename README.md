@@ -93,6 +93,24 @@ native credential boundary.
 Somedue uses Tauri 2 and Rust for its native backend, Solid and TypeScript for the
 interface, Tailwind CSS for styling, and Bun for frontend tooling.
 
+### UI styling
+
+Import shared controls from `src/ui.tsx`; their implementations live in `src/ui/`.
+`Button` and `IconButton` own their size and variant styles. `Input` and `Textarea`
+offer a `plain` variant for writing surfaces. Their `class` props use
+`tailwind-merge`, so caller utilities can override defaults without CSS overrides.
+Use `Field`, `Dialog`, `Select`, `Menu`, `Checkbox`, `Kbd`, and `SectionHeading`
+for the corresponding shared UI patterns.
+
+Use Tailwind's spacing, typography, radius, and breakpoint scales for layouts.
+`src/style.css` holds the palette, fonts, theme variants, and global Tailwind base
+rules for focus, scrollbars, and reduced motion. Custom CSS requires an exceptional
+need that Tailwind cannot cover; document that reason beside the rule. Existing
+classes such as `task-row` also serve as behavior/test hooks. Measured sidebar
+widths and viewport-aware popup positions remain runtime values.
+
+### Checks
+
 ```sh
 bun run build          # TypeScript check and production frontend build
 bun test tests         # Model, motion, and editor-save tests

@@ -26,7 +26,8 @@
     "dompurify": "^3.4.17",
     "lucide-solid": "^0.468.0",
     "marked": "^18.1.1",
-    "solid-js": "^1.9.9"
+    "solid-js": "^1.9.9",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

@@ -1,4 +1,4 @@
-import "./cloud-connection.css";
+import { Input } from "./ui";
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { Channel } from "@tauri-apps/api/core";
 import { Cloud, RefreshCw, X, ShieldCheck, Check } from "lucide-solid";
@@ -76,28 +76,28 @@ export default function CloudConnection(props: {
   return (
     <dialog
       ref={dialog}
-      class="cloud-screen"
+      class="cloud-screen fixed inset-0 m-auto max-h-[calc(100dvh_-_--spacing(12))] w-110 max-w-[calc(100vw_-_--spacing(8))] flex-col overflow-auto rounded-2xl border-0 bg-surface p-0 text-ink shadow-2xl open:flex backdrop:bg-black/50 backdrop:backdrop-blur-sm"
       aria-label="Things Cloud connection"
       onCancel={(e) => {
         e.preventDefault();
         if (!busy()) props.close();
       }}
     >
-      <div class="cloud-screen-scroll">
-        <div class="cloud-card">
+      <div class="cloud-screen-scroll flex min-h-0 flex-1 overflow-auto p-7">
+        <div class="cloud-card relative m-auto w-105 max-w-full px-1.5 py-3 text-center [&>h1]:font-sans [&>h1]:text-2xl [&>h1]:leading-tight [&>h1]:font-semibold [&>h1]:tracking-tight [&>h1]:outline-none [&>form]:text-left [&>form>.primary]:mt-1.5 [&>form>.primary]:w-full">
           <Show when={!busy()}>
             <IconButton
               size="small"
-              class="cloud-back"
+              class="cloud-back absolute -top-4 -right-4"
               aria-label="Close Things Cloud connection"
               onClick={props.close}
             >
               <X size={18} />
             </IconButton>
           </Show>
-          <div class="cloud-mark">
+          <div class="cloud-mark mx-auto mb-5.5 grid size-16 place-items-center rounded-2xl bg-selection text-accent">
             <Show when={busy()} fallback={<Cloud size={28} />}>
-              <RefreshCw size={28} class="spin" />
+              <RefreshCw size={28} class="spin animate-spin" />
             </Show>
           </div>
           <h1 ref={heading} tabIndex={-1}>
@@ -107,11 +107,14 @@ export default function CloudConnection(props: {
             when={busy()}
             fallback={
               <>
-                <p class="cloud-intro">
+                <p class="cloud-intro mt-3.5 mb-6.5 text-sm leading-relaxed text-muted">
                   Bring your projects, to-dos, and notes together.
                 </p>
                 <Show when={error()}>
-                  <div role="alert" class="cloud-error">
+                  <div
+                    role="alert"
+                    class="cloud-error my-5 rounded-lg bg-danger/10 px-4 py-3.5 text-left text-xs leading-relaxed text-danger wrap-anywhere [&>p]:my-1 [&>small]:text-muted"
+                  >
                     <strong>Connection couldn’t finish</strong>
                     <p>{error()}</p>
                     <small>Your saved workspace hasn’t been replaced.</small>
@@ -119,7 +122,7 @@ export default function CloudConnection(props: {
                 </Show>
                 <form onSubmit={connect}>
                   <Field label="Email">
-                    <input
+                    <Input
                       ref={input}
                       type="email"
                       autocomplete="username"
@@ -129,7 +132,7 @@ export default function CloudConnection(props: {
                     />
                   </Field>
                   <Field label="Things Cloud password">
-                    <input
+                    <Input
                       type="password"
                       autocomplete="current-password"
                       required
@@ -141,7 +144,7 @@ export default function CloudConnection(props: {
                     {error() ? "Try again" : "Connect Things Cloud"}
                   </Button>
                 </form>
-                <p class="cloud-privacy">
+                <p class="cloud-privacy mt-5 mb-3 flex items-center justify-center gap-2 text-xs leading-relaxed text-muted [&>svg]:shrink-0">
                   <ShieldCheck size={16} />
                   Your password stays in macOS Keychain.
                 </p>
@@ -151,17 +154,21 @@ export default function CloudConnection(props: {
               </>
             }
           >
-            <p class="cloud-intro" role="status" aria-live="polite">
+            <p
+              class="cloud-intro mt-3.5 mb-6.5 text-sm leading-relaxed text-muted"
+              role="status"
+              aria-live="polite"
+            >
               {description()}
             </p>
             <div
-              class="sync-activity"
+              class="sync-activity my-7.5 h-1 overflow-hidden rounded-full bg-hover [&>span]:block [&>span]:h-full [&>span]:w-1/3 [&>span]:rounded-full [&>span]:bg-mint motion-safe:[&>span]:animate-pulse"
               role="progressbar"
               aria-label="Initial sync in progress"
             >
               <span />
             </div>
-            <ol class="sync-steps">
+            <ol class="sync-steps mx-auto w-fit list-none p-0 text-left text-sm text-quiet [&>li]:my-4 [&>li]:flex [&>li]:items-center [&>li]:gap-2.5 [&>.done]:text-mint [&>.current]:text-ink">
               <li classList={{ done: progress().stage !== "verifying" }}>
                 <Check size={15} />
                 Verify account
@@ -182,7 +189,7 @@ export default function CloudConnection(props: {
               </li>
             </ol>
             <Show when={progress().receivedBytes > 0}>
-              <p class="sync-count">
+              <p class="sync-count mt-6 font-mono text-xs leading-6 text-muted">
                 {(progress().receivedBytes / 1024 / 1024).toFixed(1)} MB
                 received
                 <Show when={progress().items > 0}>
@@ -191,7 +198,7 @@ export default function CloudConnection(props: {
                 </Show>
               </p>
             </Show>
-            <p class="cloud-footnote">
+            <p class="cloud-footnote mx-auto mt-6 max-w-80 text-xs leading-relaxed text-muted">
               The first sync can take a few minutes. Your workspace opens when
               it’s ready.
             </p>

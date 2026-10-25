@@ -118,7 +118,7 @@ for (const viewport of [
       await select.click();
       const popup = page.getByRole("listbox");
       await expect(popup).not.toContainText("✓");
-      await expect(popup).toHaveCSS("border-radius", "20px");
+      await expect(popup).toHaveCSS("border-radius", "16px");
       await expect(popup).toHaveCSS("padding", "18px 0px");
       const r = await popup.boundingBox();
       expect(r!.x).toBeGreaterThanOrEqual(0);
@@ -182,7 +182,8 @@ for (const viewport of [
       );
       for (const i of icons) {
         expect(i.w).toBe(i.h);
-        expect(i.radius).toBe(i.compact ? "6px" : "50%");
+        if (i.compact) expect(i.radius).toBe("6px");
+        else expect(parseFloat(i.radius)).toBeGreaterThanOrEqual(i.w / 2);
         if (i.compact) expect(i.h).toBe(28);
       }
       await page
@@ -294,15 +295,15 @@ test("Screenshot regressions: padded search focus and export action", async ({
   });
   await action.scrollIntoViewIfNeeded();
   await action.focus();
-  await expect(action).toHaveCSS("padding-left", "17px");
-  await expect(action).toHaveCSS("padding-right", "17px");
+  await expect(action).toHaveCSS("padding-left", "16px");
+  await expect(action).toHaveCSS("padding-right", "16px");
   expect(
     await action.evaluate((el) => {
       const b = el.getBoundingClientRect(),
         icon = el.querySelector("svg")!.getBoundingClientRect();
       return icon.left - b.left;
     }),
-  ).toBeGreaterThanOrEqual(17);
+  ).toBeGreaterThanOrEqual(16);
   expect(await page.locator(".app").evaluate((el) => el.scrollTop)).toBe(0);
   await page.screenshot({
     animations: "disabled",

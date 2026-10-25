@@ -25,6 +25,7 @@ export function Popover(props: {
     trigger.focus({ preventScroll: true });
   };
   const position = () => {
+    // Anchored viewport placement depends on measured screen coordinates, not static styling.
     const r = trigger.getBoundingClientRect();
     const width = Math.min(props.width || 272, innerWidth - 24);
     panel.style.width = `${width}px`;
@@ -75,7 +76,7 @@ export function Popover(props: {
         popover="auto"
         role="dialog"
         aria-label={props.label}
-        class={`control-popover ${props.class ? `${props.class}-panel` : ""}`}
+        class={`control-popover fixed inset-auto m-0 w-68 max-w-[calc(100vw_-_--spacing(6))] overflow-auto rounded-xl border-0 bg-surface p-0 text-ink shadow-2xl has-[.ui-menu]:rounded-2xl has-[.ui-menu]:bg-surface/65 has-[.ui-menu]:backdrop-blur-xl [&_h3]:m-0 [&_h3]:font-sans [&_h3]:text-sm [&_h3]:font-semibold [&_p]:m-0 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:text-muted [&_p.error-text]:text-danger [&_.field]:m-0 ${props.class ? `${props.class}-panel` : ""}`}
         onToggle={() => setOpened(panel.matches(":popover-open"))}
         onKeyDown={(e) => {
           e.stopPropagation();
@@ -85,7 +86,9 @@ export function Popover(props: {
           }
         }}
       >
-        <div class="control-popover-body">{props.children(close)}</div>
+        <div class="control-popover-body grid min-w-0 gap-2 p-2.5 has-[>.ui-menu]:gap-0 has-[>.ui-menu]:p-2">
+          {props.children(close)}
+        </div>
       </div>
     </div>
   );

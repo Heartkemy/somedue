@@ -17,7 +17,13 @@ test("pointer focus stays quiet; keyboard focus, scroll indicators and sidebar c
   const rows = page.locator(".list-menu > button");
   for (const row of await rows.all()) {
     await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(row).toHaveCSS("border-radius", "999px");
+    expect(
+      await row.evaluate(
+        (el) =>
+          parseFloat(getComputedStyle(el).borderRadius) >=
+          el.getBoundingClientRect().height / 2,
+      ),
+    ).toBe(true);
     await expect(row.locator("svg")).toHaveCount(1);
   }
   await page.keyboard.press("ArrowDown");
