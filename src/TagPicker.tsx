@@ -1,3 +1,4 @@
+import { Input } from "./ui";
 import { createSignal, createMemo, For, Show } from "solid-js";
 import { Tag, Plus, X } from "lucide-solid";
 import { Button, Checkbox, IconButton } from "./ui";
@@ -48,7 +49,7 @@ export default function TagPicker(props: {
     }
   }
   return (
-    <div class="tag-picker">
+    <div class="tag-picker flex flex-wrap items-center gap-1.5">
       <Popover
         size={props.compact ? "compact" : "small"}
         label={props.label || "Tags"}
@@ -64,13 +65,13 @@ export default function TagPicker(props: {
         {() => (
           <>
             <form
-              class="tag-picker-search"
+              class="tag-picker-search flex min-w-0 items-center gap-1 [&>input]:min-h-8 [&>input]:px-2 [&>input]:py-1 [&>input]:text-xs"
               onSubmit={(e) => {
                 e.preventDefault();
                 void add();
               }}
             >
-              <input
+              <Input
                 autofocus
                 aria-label="Find or create tag"
                 placeholder="Find or create a tag"
@@ -88,14 +89,20 @@ export default function TagPicker(props: {
               </IconButton>
             </form>
             <Show when={error()}>
-              <p role="alert" class="error-text">
+              <p
+                role="alert"
+                class="error-text mb-4 text-xs leading-relaxed text-danger"
+              >
                 {error()}
               </p>
             </Show>
-            <div class="tag-picker-list" aria-label="Available tags">
+            <div
+              class="tag-picker-list -m-1 grid max-h-56 gap-px overflow-auto p-1"
+              aria-label="Available tags"
+            >
               <For each={filtered()}>
                 {(tag) => (
-                  <label class="tag-picker-option">
+                  <label class="tag-picker-option flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm wrap-anywhere hover:bg-hover focus-within:bg-selection [&>span]:min-w-0">
                     <Checkbox
                       aria-label={title(tag)}
                       disabled={busy()}
@@ -129,7 +136,7 @@ export default function TagPicker(props: {
         {(tag) => (
           <Button
             size={props.compact ? "compact" : "small"}
-            class="assigned-tag"
+            class="assigned-tag text-accent"
             aria-label={`Remove tag ${title(tag)}`}
             onClick={() => toggle(tag.id)}
           >

@@ -96,7 +96,7 @@ for (const width of [1120, 760])
     expect(new Set(geometry.map((x) => x.textX)).size).toBe(1);
     expect(new Set(geometry.map((x) => x.width)).size).toBe(1);
     for (const row of geometry) {
-      expect(row.height).toBe(26);
+      expect(row.height).toBe(28);
       expect(row.centerError).toBeLessThan(0.5);
     }
     const sidebarFooter = await page.locator(".sidebar-bottom").boundingBox(),
@@ -121,7 +121,7 @@ for (const width of [1120, 760])
     await expect(toggle).toHaveCSS("opacity", "1");
     const caretBox = (await toggle.boundingBox())!,
       areaBox = (await page.locator(".area-link").first().boundingBox())!;
-    expect(caretBox.width).toBe(26);
+    expect(caretBox.width).toBe(28);
     expect(caretBox.x).toBeGreaterThan(areaBox.x + areaBox.width - 40);
     const before = (await page
       .locator(".area-link .sidebar-label")

@@ -1,3 +1,4 @@
+import { Input, Textarea, Kbd } from "./ui";
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -64,15 +65,21 @@ export default function QuickEntry() {
     }
   }
   return (
-    <div class="app quick-app" data-theme={theme()}>
-      <div class="quick-titlebar" data-tauri-drag-region>
+    <div
+      class="app quick-app bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink flex h-dvh min-w-0 flex-col"
+      data-theme={theme()}
+    >
+      <div
+        class="quick-titlebar flex h-13 shrink-0 items-center justify-between py-2.5 pr-4.5 pl-21 text-xs text-quiet"
+        data-tauri-drag-region
+      >
         <span>Quick Entry</span>
         <IconButton aria-label="Close quick entry" onClick={() => void close()}>
           <X size={16} />
         </IconButton>
       </div>
       <form
-        class="quick-form"
+        class="quick-form flex min-h-0 flex-1 flex-col gap-3 px-7 pt-4 pb-6 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:text-xl [&>input]:font-medium [&>textarea]:min-h-18 [&>textarea]:flex-1 [&>textarea]:bg-transparent [&>textarea]:px-0 [&>textarea]:py-1 [&>textarea]:text-sm [&>textarea]:text-muted"
         onSubmit={(e) => {
           e.preventDefault();
           void save();
@@ -89,7 +96,8 @@ export default function QuickEntry() {
             void close();
         }}
       >
-        <input
+        <Input
+          variant="plain"
           ref={input}
           autofocus
           aria-label="Quick entry title"
@@ -97,18 +105,22 @@ export default function QuickEntry() {
           value={title()}
           onInput={(e) => setTitle(e.currentTarget.value)}
         />
-        <textarea
+        <Textarea
+          variant="plain"
           aria-label="Quick entry notes"
           placeholder="Notes"
           value={notes()}
           onInput={(e) => setNotes(e.currentTarget.value)}
         />
         <Show when={error()}>
-          <p role="alert" class="error-text">
+          <p
+            role="alert"
+            class="error-text mb-4 text-xs leading-relaxed text-danger"
+          >
             {error()}
           </p>
         </Show>
-        <div class="quick-actions">
+        <div class="quick-actions flex items-end justify-between gap-4.5 [&>.field]:m-0 [&>.field]:flex-1">
           <Field label="Add to">
             <Select
               value={destination()}
@@ -128,7 +140,7 @@ export default function QuickEntry() {
           >
             <Plus size={16} />
             {saving() ? "Saving…" : "Add To-Do"}
-            <kbd>⌘ ↵</kbd>
+            <Kbd>⌘ ↵</Kbd>
           </Button>
         </div>
       </form>
