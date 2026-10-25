@@ -190,7 +190,7 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
         ref={popup}
         id={id}
         popover="auto"
-        class="select-popup fixed inset-auto m-0 overflow-auto overscroll-contain rounded-2xl border-0 bg-surface py-4.5 font-sans text-sm leading-6 text-ink shadow-2xl outline-none [scrollbar-width:thin] backdrop:bg-transparent"
+        class="select-popup fixed inset-auto m-0 overflow-auto overscroll-contain rounded-2xl border-0 bg-surface py-4.5 font-sans text-sm leading-6 text-ink shadow-xl ring-1 ring-ink/15 outline-none [scrollbar-width:thin] backdrop:bg-transparent"
         role="listbox"
         tabIndex={-1}
         aria-label={props["aria-label"] || "Options"}

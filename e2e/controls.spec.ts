@@ -22,7 +22,13 @@ for (const viewport of [
       page,
     }, info) => {
       await page.getByRole("button", { name: "Settings", exact: true }).click();
-      const dialog = page.getByRole("dialog");
+      const dialog = page.getByRole("region", {
+        name: "Settings",
+        exact: true,
+      });
+      await expect(
+        page.getByRole("dialog", { name: "Settings", exact: true }),
+      ).toHaveCount(0);
       await dialog.evaluate((el) =>
         Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {}))),
       );
@@ -39,12 +45,11 @@ for (const viewport of [
       ]) {
         await page.getByRole("button", { name: tab, exact: true }).click();
         const bounds = await dialog.boundingBox();
-        expect(
-          Math.abs(bounds!.x + bounds!.width / 2 - viewport.width / 2),
-        ).toBeLessThan(1);
-        expect(
-          Math.abs(bounds!.y + bounds!.height / 2 - viewport.height / 2),
-        ).toBeLessThan(1);
+        expect(bounds!.x).toBeGreaterThanOrEqual(
+          (await page.locator(".sidebar").boundingBox())!.width,
+        );
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+        expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
         expect(
           await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
         ).toBeTruthy();
@@ -69,7 +74,7 @@ for (const viewport of [
       await expect(checkbox).not.toBeChecked();
       await page.keyboard.press("Space");
       await expect(checkbox).toBeChecked();
-      await expect(checkbox).toHaveCSS("background-color", "rgb(255, 194, 0)");
+      await expect(checkbox).toHaveCSS("background-color", "rgb(0, 255, 208)");
       expect(
         await checkbox.evaluate((el) => {
           const s = getComputedStyle(el);
@@ -77,11 +82,11 @@ for (const viewport of [
             s.appearance,
             s.width,
             s.height,
-            s.borderRadius,
+            parseFloat(s.borderRadius) >= 9,
             s.backgroundColor,
           ];
         }),
-      ).toEqual(["none", "18px", "18px", "6px", "rgb(255, 194, 0)"]);
+      ).toEqual(["none", "18px", "18px", true, "rgb(0, 255, 208)"]);
       expect(await page.locator(".app").evaluate((el) => el.scrollTop)).toBe(0);
       await page.screenshot({
         animations: "disabled",

@@ -87,6 +87,38 @@ fn postcondition_met(pending: &Pending, remote: &Snapshot) -> bool {
         })
 }
 
+/// Network work owns a fixed prefix; edits queued since its last checkpoint stay local.
+pub(crate) fn merge_sync_checkpoint(
+    synced: &Workspace,
+    current: &Workspace,
+    previous_pending: usize,
+) -> Result<Workspace, String> {
+    let queued = current.pending.get(previous_pending..).ok_or(
+        "Pending edits changed during synchronization; the current workspace was preserved.",
+    )?;
+    let mut next = synced.clone();
+    next.pending.extend_from_slice(queued);
+    rebuild_view(&mut next)?;
+    Ok(next)
+}
+
+pub(crate) fn recover(
+    current: &Workspace,
+    remote: Snapshot,
+    pending_before_pull: usize,
+) -> Result<Workspace, String> {
+    if current.pending.len() != pending_before_pull {
+        return Err("New edits were saved while recovery was loading. Review your drafts and try again; nothing was replaced.".into());
+    }
+    Ok(Workspace {
+        history_fingerprint: Some(history_fingerprint(&remote.history)),
+        snapshot: remote.clone(),
+        authoritative: Some(remote),
+        pending: vec![],
+        last_sync: Some(chrono::Utc::now().to_rfc3339()),
+    })
+}
+
 /// The persisted `sending` state is the crash boundary: it is never automatically sent again.
 /// A returned pre-send failure is explicitly reset to queued; uncertainty remains blocked.
 pub(crate) async fn sync<R: Remote>(
@@ -472,6 +504,20 @@ mod tests {
         assert!(remaining.contains(&1));
         assert!(workspace.pending.is_empty());
         assert_eq!(workspace.snapshot.entities[&id].props["tt"], "Second");
+    }
+    #[test]
+    fn recovery_does_not_discard_edits_saved_during_the_cloud_pull() {
+        let (base, id) = fixture();
+        let first = edit(&base, &id, "Existing draft");
+        let concurrent = edit(&first, &id, "New draft during recovery");
+        assert!(recover(&concurrent, base.snapshot.clone(), first.pending.len()).is_err());
+        assert_eq!(
+            concurrent.snapshot.entities[&id].props["tt"],
+            "New draft during recovery"
+        );
+        let restored = recover(&concurrent, base.snapshot, concurrent.pending.len()).unwrap();
+        assert!(restored.pending.is_empty());
+        assert_eq!(restored.snapshot.entities[&id].props["tt"], "Original");
     }
     #[test]
     fn reconnect_preserves_original_drafts_and_rejects_changed_history() {

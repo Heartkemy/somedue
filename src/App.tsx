@@ -1,4 +1,4 @@
-import { Input, Textarea, Kbd, SectionHeading } from "./ui";
+import { Input, Textarea, Kbd } from "./ui";
 import {
   createSignal,
   createMemo,
@@ -33,32 +33,40 @@ import {
   Flag,
   Repeat2,
   MoreHorizontal,
-  Cloud,
   RefreshCw,
-  Tag,
   Moon,
   Folder,
-  CheckCheck,
   X,
   Box,
   PanelLeft,
   ArrowRight,
-  Copy,
-  Share2,
   ListChecks,
   FileText,
 } from "lucide-solid";
-import appIcon from "../assets/icon/app.svg";
+import TaskRow from "./TaskRow";
+import SettingsPage from "./SettingsPage";
+import TaskMenu, { type TaskAction } from "./TaskMenu";
+import {
+  AreaIcon,
+  isDueToday,
+  isSomeday,
+  ProjectProgress as ProjectProgressIcon,
+} from "./TaskIndicators";
+import { selectListItems } from "./list-selection";
 import {
   Select,
   Button,
   IconButton,
   Checkbox,
+  CheckButton,
+  Pill,
+  ActionBar,
   Dialog,
   Field,
   FeedbackContext,
   Menu,
   MenuItem,
+  MenuPopup,
 } from "./ui";
 import CloudConnection from "./CloudConnection";
 import { call, native } from "./api";
@@ -70,6 +78,7 @@ import {
   lists,
   title,
   isProject,
+  isTask,
   isHeading,
   isTemplate,
   refs,
@@ -89,10 +98,8 @@ import {
   deleteTree,
   uuid,
   later,
-  projectStats,
   orderBefore,
   scheduleBucket,
-  projectProgressPath,
   effectiveTags,
 } from "./model";
 import Markdown from "./Markdown";
@@ -131,7 +138,16 @@ const initial: State = {
 export default function App() {
   const [state, setRawState] = createSignal<State>(initial),
     [list, setList] = createSignal<string>("Inbox"),
-    [selected, setSelected] = createSignal(""),
+    [selected, setFocused] = createSignal(""),
+    [selection, setSelection] = createSignal<string[]>([]),
+    [taskMenu, setTaskMenu] = createSignal<{ x: number; y: number } | null>(
+      null,
+    ),
+    [batchEdit, setBatchEdit] = createSignal<
+      "when" | "deadline" | "tags" | null
+    >(null),
+    [infoItem, setInfoItem] = createSignal<Entity | null>(null),
+    [newTasks, setNewTasks] = createSignal<string[]>([]),
     [editing, setEditing] = createSignal(""),
     [draft, setDraft] = createSignal<Entity | null>(null),
     [query, setQuery] = createSignal(""),
@@ -161,6 +177,7 @@ export default function App() {
     [editorActions, setEditorActions] = createSignal<{
       move: () => void;
       more: () => void;
+      action: (action: TaskAction) => void;
     } | null>(null),
     [sidebarWidth, setSidebarWidth] = createSignal(236),
     [confirming, setConfirming] = createSignal(false),
@@ -169,6 +186,168 @@ export default function App() {
       action: () => Promise<void>;
     } | null>(null),
     [undo, setUndo] = createSignal<Changes | null>(null);
+  let selectionAnchor = "";
+  function setSelected(id: string) {
+    batch(() => {
+      setFocused(id);
+      setSelection(id ? [id] : []);
+    });
+    selectionAnchor = id;
+  }
+  function selectItem(item: Entity, e: MouseEvent | KeyboardEvent) {
+    const ids = selectListItems(
+      items().map((row) => row.id),
+      selection(),
+      selectionAnchor,
+      item.id,
+      { toggle: e.metaKey || e.ctrlKey, range: e.shiftKey },
+    );
+    batch(() => {
+      setSelection(ids);
+      setFocused(ids.includes(item.id) ? item.id : ids.at(-1) || "");
+    });
+    if (!e.shiftKey) selectionAnchor = item.id;
+  }
+  const selectedItems = () =>
+    items().filter((item) => selection().includes(item.id));
+  async function patchSelection(p: Props | ((item: Entity) => Props)) {
+    const changes = Object.assign(
+      {},
+      ...selectedItems().map((item) =>
+        event(item, typeof p === "function" ? p(item) : p),
+      ),
+    );
+    if (Object.keys(changes).length) await run(() => mutate(changes));
+  }
+  async function completeSelection(cancel = false) {
+    const reopen = selectedItems().every((item) => !!item.props.ss);
+    await patchSelection({
+      ss: reopen ? 0 : cancel ? 2 : 3,
+      sp: reopen ? null : Date.now() / 1000,
+    });
+  }
+  async function removeSelection() {
+    await patchSelection({ tr: true });
+    setSelected("");
+  }
+  function openTaskMenu(item: Entity, e?: MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (isHeading(item)) {
+      setEditing(item.id);
+      queueMicrotask(() =>
+        document
+          .querySelector<HTMLButtonElement>('[aria-label="Heading actions"]')
+          ?.click(),
+      );
+      return;
+    }
+    if (!selection().includes(item.id)) setSelected(item.id);
+    const row = document
+      .getElementById(`item-${item.id}`)
+      ?.getBoundingClientRect();
+    setTaskMenu({
+      x: e?.clientX ?? row?.right ?? 300,
+      y: e?.clientY ?? row?.bottom ?? 200,
+    });
+  }
+  function closeTaskMenu() {
+    setTaskMenu(null);
+    document
+      .getElementById(`item-${selected()}`)
+      ?.focus({ preventScroll: true });
+  }
+  function applyIncoming(next: State) {
+    const known = new Set(all().map((item) => item.id));
+    setNewTasks((ids) => [
+      ...new Set([
+        ...ids,
+        ...next.entities
+          .filter(
+            (item) =>
+              !known.has(item.id) &&
+              isTask(item) &&
+              !isProject(item) &&
+              !isHeading(item) &&
+              !isTemplate(item) &&
+              active(item, next.entities),
+          )
+          .map((item) => item.id),
+      ]),
+    ]);
+    setState(next);
+  }
+  const visibleNewTasks = () =>
+    items().filter((item) => newTasks().includes(item.id));
+  function taskAction(action: TaskAction) {
+    const item = chosen();
+    if (!item) return;
+    const modes = {
+      today: "Today",
+      evening: "This Evening",
+      anytime: "Anytime",
+      someday: "Someday",
+    };
+    if (action in modes) {
+      void patchSelection(schedule(modes[action as keyof typeof modes]));
+      return;
+    }
+    if (
+      ["when", "deadline", "tags"].includes(action) &&
+      selection().length > 1
+    ) {
+      setBatchEdit(action as "when" | "deadline" | "tags");
+      return;
+    }
+    if (action === "move") {
+      setMoving(true);
+      return;
+    }
+    if (action === "delete") {
+      void removeSelection();
+      return;
+    }
+    if (["complete", "cancel", "reopen"].includes(action)) {
+      void patchSelection({
+        ss: action === "complete" ? 3 : action === "cancel" ? 2 : 0,
+        sp: action === "reopen" ? null : Date.now() / 1000,
+      });
+      return;
+    }
+    if (action === "info") {
+      setInfoItem(item);
+      return;
+    }
+    if (action === "duplicate") {
+      void run(() => duplicate(item));
+      return;
+    }
+    if (action === "removeProject") {
+      void patchSelection({ pr: [], agr: [] });
+      return;
+    }
+    if (action === "showProject") {
+      const project = refs(item, "pr")[0];
+      if (project) navigate(project);
+      return;
+    }
+    if (action === "share") {
+      void shareTask(title(item), noteText(item));
+      return;
+    }
+    setEditing(item.id);
+    queueMicrotask(() => editorActions()?.action(action));
+  }
+  async function shareTask(name: string, notes: string) {
+    await run(async () => {
+      const text = [name, notes].filter(Boolean).join("\n\n");
+      if (navigator.share) await navigator.share({ title: name, text });
+      else {
+        await navigator.clipboard.writeText(text);
+        toast("Copied to clipboard");
+      }
+    });
+  }
   const [editorFooter, setEditorFooter] = createSignal<HTMLDivElement>();
   function setState(input: State | ((previous: State) => State)) {
     setRawState((previous) => {
@@ -189,19 +368,20 @@ export default function App() {
       };
     });
   }
+  function closeSettings() {
+    setSettings(false);
+    queueMicrotask(() =>
+      document
+        .querySelector<HTMLButtonElement>('[aria-label="Settings"]')
+        ?.focus({ preventScroll: true }),
+    );
+  }
   function openSettings() {
     if (editing()) {
       toast("Save or close the open to-do first.");
       return;
     }
     setSettings(true);
-  }
-  function editItem(item: Entity) {
-    if (editing() && editing() !== item.id) {
-      toast("Save or close the open to-do first.");
-      return;
-    }
-    setEditing(item.id);
   }
   let saveEditor:
     ((handoff?: boolean) => Promise<boolean | undefined> | false) | undefined;
@@ -259,6 +439,7 @@ export default function App() {
   }
   let noticeTimer: ReturnType<typeof setTimeout>;
   let syncTimer: ReturnType<typeof setTimeout>;
+  let mutationVersion = 0;
   function scheduleSync() {
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => {
@@ -329,7 +510,7 @@ export default function App() {
     chosen = () =>
       draft()?.id === selected()
         ? draft()!
-        : all().find((e) => e.id === selected());
+        : items().find((e) => e.id === selected());
   const unfilteredItems = createMemo(() => {
     draftRevision();
     // Keep a live editor's row identity stable while an earlier save updates state.
@@ -369,6 +550,22 @@ export default function App() {
     state().preferences[key] ?? fallback;
   createEffect(
     on(
+      items,
+      (rows) => {
+        const visible = new Set(rows.map((item) => item.id));
+        const remaining = selection().filter((id) => visible.has(id));
+        if (remaining.length === selection().length) return;
+        batch(() => {
+          setSelection(remaining);
+          if (!visible.has(selected()) && editing() !== selected())
+            setFocused(remaining.at(-1) || "");
+        });
+      },
+      { defer: true },
+    ),
+  );
+  createEffect(
+    on(
       editing,
       (id) => {
         if (!id && state().pending) scheduleSync();
@@ -401,14 +598,20 @@ export default function App() {
       return;
     }
     setBusy(true);
-    await run(async () => {
-      setState(await call("sync"));
-      toast(
-        state().account === "local" ? "Local workspace saved" : "Up to date",
-      );
+    const startedAt = mutationVersion;
+    const synced = await run(async () => {
+      applyIncoming(await call("sync"));
+      return true;
     });
-    setBusy(false);
     if (native()) await run(async () => setState(await call("load")));
+    setBusy(false);
+    if (
+      synced &&
+      mutationVersion !== startedAt &&
+      state().pending &&
+      !state().blocked
+    )
+      scheduleSync();
   }
   async function mutate(changes: Changes, confirmed = false, remember = true) {
     const inverse: Changes = {};
@@ -425,6 +628,7 @@ export default function App() {
         };
     }
     const next = await call("mutate", { changes, confirm: confirmed });
+    mutationVersion++;
     setState(next);
     if (remember) setUndo(inverse);
     scheduleSync();
@@ -442,6 +646,7 @@ export default function App() {
     return run(() => mutate(event(e, p)));
   }
   function beginCreate(kind: string | null) {
+    if (kind) setSettings(false);
     if (kind && editing()) {
       toast("Save or close the open to-do first.");
       return;
@@ -500,6 +705,7 @@ export default function App() {
       toast("Save or close the open to-do first.");
       return;
     }
+    setSettings(false);
     setList(id);
     setQuery("");
     setTag("");
@@ -535,7 +741,6 @@ export default function App() {
       if (session && currentEditor === session) setEditing("");
       if (session) releaseEditor(session);
     });
-    toast(e.props.ss ? "Reopened" : cancel ? "Canceled" : "Completed");
   }
   async function remove(e: Entity) {
     const session = editorSaves.drafts.get(e.id);
@@ -548,7 +753,6 @@ export default function App() {
       if (session) releaseEditor(session);
       if (draft()?.id === e.id) setDraft(null);
     });
-    toast("Moved to Trash");
   }
   async function reorder(e: Entity, direction: number) {
     const arr = rowPeers(e),
@@ -716,19 +920,29 @@ export default function App() {
         (e.target as HTMLElement).closest("button,summary,a"))
     )
       return;
+    if (settings()) {
+      if (e.key === "Escape") closeSettings();
+      return;
+    }
     const item = chosen();
     if (cmd && k === "z" && undo()) {
       e.preventDefault();
       void run(async () => {
         await mutate(undo()!, true, false);
         setUndo(null);
-        toast("Undone");
       });
+      return;
+    }
+    if (cmd && k === "a") {
+      e.preventDefault();
+      setSelection(items().map((row) => row.id));
+      setFocused(items()[0]?.id || "");
+      selectionAnchor = items()[0]?.id || "";
       return;
     }
     if (cmd && k === "k" && item) {
       e.preventDefault();
-      void run(() => complete(item, e.altKey));
+      void completeSelection(e.altKey);
       return;
     }
     if (cmd && k === "d" && !e.shiftKey && item) {
@@ -738,8 +952,7 @@ export default function App() {
     }
     if (cmd && ["t", "e", "r", "o"].includes(k) && item) {
       e.preventDefault();
-      void patch(
-        item,
+      void patchSelection(
         schedule(
           (
             {
@@ -769,6 +982,7 @@ export default function App() {
     }
     if (e.key === "Escape") {
       setEditing("");
+      setSelected("");
       setDraft(null);
       setQuery("");
       setTag("");
@@ -777,12 +991,17 @@ export default function App() {
     }
     if ((e.key === "Backspace" || e.key === "Delete") && item) {
       e.preventDefault();
-      void run(() => remove(item));
+      void removeSelection();
       return;
     }
     if (e.key === "Enter" && item) {
       e.preventDefault();
       openItem(item);
+      return;
+    }
+    if ((e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) && item) {
+      e.preventDefault();
+      openTaskMenu(item);
       return;
     }
     if (e.key === " ") {
@@ -800,7 +1019,8 @@ export default function App() {
       const i = items().findIndex((x) => x.id === selected());
       const next = items()[Math.max(0, Math.min(items().length - 1, i + d))];
       if (next) {
-        setSelected(next.id);
+        if (e.shiftKey) selectItem(next, e);
+        else setSelected(next.id);
         document
           .getElementById("item-" + next.id)
           ?.scrollIntoView({ block: "nearest" });
@@ -887,7 +1107,7 @@ export default function App() {
         (f) => (unlistenSyncError = f),
       );
       void listen("workspace-changed", () => {
-        if (!editing()) void run(async () => setState(await call("load")));
+        if (!editing()) void run(async () => applyIncoming(await call("load")));
       }).then((f) => (unlistenWorkspace = f));
       void listen<string>("menu-action", (ev) => {
         if (
@@ -992,7 +1212,7 @@ export default function App() {
   return (
     <FeedbackContext.Provider value={error}>
       <div
-        class="app grid h-dvh grid-rows-[--spacing(11)_minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
+        class="app grid h-dvh grid-rows-[--spacing(14)_minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
         classList={{
           "grid-cols-1": !sidebar(),
           "grid-cols-[var(--sidebar-width)_minmax(0,1fr)]": sidebar(),
@@ -1006,9 +1226,9 @@ export default function App() {
         data-motion={pref("motion", true) ? "on" : "off"}
       >
         <div
-          class="titlebar col-span-full row-start-1 z-2 flex h-8 items-center justify-end self-start pl-22 text-xs tracking-wide text-quiet select-none"
+          class="titlebar col-span-full row-start-1 z-2 flex h-14 items-center justify-end self-start pl-22 text-xs tracking-wide text-quiet select-none"
           style={{
-            "padding-right": `calc(100% - ${sidebar() ? sidebarWidth() : 136}px + 8px)`,
+            "padding-right": `calc(100% - ${sidebar() ? sidebarWidth() : 136}px + 16px)`,
           }}
           data-tauri-drag-region
         >
@@ -1025,7 +1245,7 @@ export default function App() {
         </div>
         <Show when={sidebar()}>
           <aside
-            class="sidebar relative col-start-1 row-span-full row-start-1 flex min-h-0 min-w-0 flex-col bg-linear-to-b from-sidebar-start to-sidebar-end pt-11"
+            class="sidebar relative col-start-1 row-span-full row-start-1 flex min-h-0 min-w-0 flex-col bg-linear-to-b from-sidebar-start to-sidebar-end pt-14"
             inert={connectionOpen()}
           >
             <div
@@ -1054,7 +1274,7 @@ export default function App() {
                 }
               }}
             />
-            <div class="sidebar-body min-h-0 flex-1 overflow-auto overscroll-contain px-2 pb-3 [scrollbar-gutter:stable]">
+            <div class="sidebar-body min-h-0 flex-1 overflow-auto overscroll-contain px-4 pb-4 [scrollbar-gutter:stable]">
               <nav aria-label="Lists">
                 <For each={lists}>
                   {(name, i) => {
@@ -1163,17 +1383,13 @@ export default function App() {
                         </Button>
                         <Button
                           variant="bare"
-                          class="sidebar-item area-link grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink pr-9 font-semibold [&>svg]:text-mint group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection"
+                          class="sidebar-item area-link grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink pr-9 font-semibold group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection"
                           classList={{ active: list() === a.id }}
                           onClick={() => navigate(a.id)}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => dropIn(e, a)}
                         >
-                          {collapsed().includes(a.id) ? (
-                            <Layers size={16} />
-                          ) : (
-                            <Box size={16} />
-                          )}
+                          <AreaIcon stacked={collapsed().includes(a.id)} />
                           <span class="sidebar-label block min-w-0 truncate">
                             {title(a)}
                           </span>
@@ -1202,7 +1418,7 @@ export default function App() {
                 </Show>
               </div>
             </div>
-            <div class="sidebar-bottom flex h-12 min-h-12 shrink-0 items-center gap-1 border-t border-hover px-2">
+            <div class="sidebar-bottom flex h-12 min-h-12 shrink-0 items-center gap-1 border-t border-hover px-4">
               <Button
                 variant="bare"
                 class="sidebar-new-list min-w-0 gap-1 rounded-full px-1 py-1.5 text-xs text-muted"
@@ -1258,7 +1474,7 @@ export default function App() {
           inert={connectionOpen()}
         >
           <svg
-            class="workspace-curves pointer-events-none absolute -top-11 right-0 -z-1 h-56 w-7/8 opacity-30"
+            class="workspace-curves pointer-events-none absolute -top-14 right-0 -z-1 h-56 w-7/8 opacity-30"
             viewBox="0 0 1000 220"
             preserveAspectRatio="none"
             fill="none"
@@ -1280,7 +1496,7 @@ export default function App() {
               stroke-width=".45"
             />
           </svg>
-          <div class="top-tools absolute -top-11 right-0 z-10 flex h-8 shrink-0 items-center justify-end gap-2 px-7">
+          <div class="top-tools absolute -top-14 right-0 z-10 flex h-14 shrink-0 items-center justify-end gap-2 px-7">
             <IconButton
               size="compact"
               variant="quiet"
@@ -1323,7 +1539,7 @@ export default function App() {
             </div>
             <Show when={menu()}>
               <Menu
-                class="popover list-menu floating-surface absolute top-8.5 right-7 z-20 max-h-[calc(100dvh_-_--spacing(20))] w-72 max-w-[calc(100vw_-_--spacing(6))] overflow-y-auto rounded-2xl bg-surface/65 p-2 text-ink shadow-2xl backdrop-blur-xl [&>hr]:mx-2 [&>hr]:my-1 [&>hr]:border-0 [&>hr]:border-t [&>hr]:border-hover"
+                class="popover list-menu floating-surface absolute top-12 right-7 z-20 max-h-[calc(100dvh_-_--spacing(20))] w-72 max-w-[calc(100vw_-_--spacing(6))] overflow-y-auto rounded-2xl bg-surface/65 p-2 text-ink shadow-2xl backdrop-blur-xl [&>hr]:mx-2 [&>hr]:my-1 [&>hr]:border-0 [&>hr]:border-t [&>hr]:border-hover"
                 aria-label="List actions"
                 close={() => {
                   setMenu(false);
@@ -1473,574 +1689,472 @@ export default function App() {
               </IconButton>
             </div>
           </Show>
-          <section
-            class="list-page relative min-h-0 flex-1 overflow-auto scroll-smooth px-11 pt-5 pb-9 max-lg:px-7 max-lg:pb-8 data-[list=Logbook]:[&_.list-group-heading]:mt-6 data-[list=Logbook]:[&_.list-group-heading]:border-b data-[list=Logbook]:[&_.list-group-heading]:border-hover data-[list=Logbook]:[&_.list-group-heading]:pb-2.5 data-[list=Logbook]:[&_.list-group-heading]:text-sm data-[list=Logbook]:[&_.list-group-heading]:font-semibold data-[list=Logbook]:[&_.list-group-heading]:text-ink"
-            data-list={list()}
+          <Show
+            when={!settings()}
+            fallback={
+              <SettingsPage
+                state={state()}
+                tab={settingsTab()}
+                setTab={setSettingsTab}
+                backLabel={current() ? title(current()!) : list()}
+                close={closeSettings}
+                connect={() => {
+                  setSettings(false);
+                  setConnectionOpen(true);
+                }}
+                syncing={busy()}
+                sync={refresh}
+                changeState={setState}
+                mutate={mutate}
+                run={run}
+                ask={ask}
+              />
+            }
           >
-            <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
-              <div class="heading-line flex items-baseline gap-3">
-                <span class="page-symbol flex size-7 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
-                  {list() === "Inbox" ? (
-                    <Inbox />
-                  ) : list() === "Today" ? (
-                    <Star />
-                  ) : list() === "Upcoming" ? (
-                    <CalendarDays />
-                  ) : list() === "Trash" ? (
-                    <Trash2 />
-                  ) : list() === "Logbook" ? (
-                    <BookOpen />
-                  ) : current() && isProject(current()!) ? (
-                    <ProjectProgress project={current()!} />
-                  ) : (
-                    <Layers />
-                  )}
-                </span>
-                <h1 class="min-w-0 font-serif text-4xl leading-tight font-medium tracking-tight wrap-anywhere [&_[data-motion-word]]:inline-block">
-                  <For
-                    each={(query()
-                      ? "Search results"
-                      : current()
-                        ? title(current()!)
-                        : list()
-                    ).split(" ")}
+            <section
+              class="list-page relative min-h-0 flex-1 overflow-auto scroll-smooth px-11 pt-7 pb-9 max-lg:px-7 max-lg:pb-8 data-[list=Logbook]:[&_.list-group-heading]:mt-6 data-[list=Logbook]:[&_.list-group-heading]:border-b data-[list=Logbook]:[&_.list-group-heading]:border-hover data-[list=Logbook]:[&_.list-group-heading]:pb-2.5 data-[list=Logbook]:[&_.list-group-heading]:text-sm data-[list=Logbook]:[&_.list-group-heading]:font-semibold data-[list=Logbook]:[&_.list-group-heading]:text-ink"
+              data-list={list()}
+            >
+              <Show when={visibleNewTasks().length}>
+                <div
+                  class="new-todos mb-7 flex items-center justify-between gap-4 rounded-lg bg-highlight/20 px-4 py-3 text-sm text-accent"
+                  role="status"
+                >
+                  <span>
+                    You have {visibleNewTasks().length} new to-do
+                    {visibleNewTasks().length === 1 ? "" : "s"}
+                  </span>
+                  <Button
+                    size="small"
+                    class="bg-highlight text-on-highlight hover:bg-highlight/90"
+                    onClick={() => {
+                      const ids = new Set(
+                        visibleNewTasks().map((item) => item.id),
+                      );
+                      setNewTasks((previous) =>
+                        previous.filter((id) => !ids.has(id)),
+                      );
+                    }}
                   >
-                    {(word) => (
-                      <span data-motion-word>
-                        {word}
-                        {"\u00a0"}
-                      </span>
-                    )}
-                  </For>
-                </h1>
-              </div>
-              <Show when={current() && isProject(current()!)}>
-                <Textarea
-                  variant="plain"
-                  class="project-notes mt-3 block min-h-8 w-full resize-y px-0 py-1 text-sm leading-relaxed text-muted"
-                  rows="1"
-                  aria-label="Project notes"
-                  placeholder="Add notes to this project…"
-                  value={noteText(current()!)}
-                  onChange={(e) =>
-                    void patch(current()!, { nt: e.currentTarget.value })
-                  }
-                />
+                    OK
+                  </Button>
+                </div>
               </Show>
-              <div class="header-controls mt-3 flex items-start gap-2.5 empty:hidden">
-                <Show when={current()}>
-                  <div class="list-tag-editor shrink-0">
-                    <TagPicker
-                      label="List tags"
-                      compact
-                      tags={tags()}
-                      selected={refs(current()!, "tg")}
-                      change={(ids) => void patch(current()!, { tg: ids })}
-                      create={createTag}
-                    />
-                  </div>
-                </Show>
-                <Show when={filterTags().length}>
-                  <div class="tag-filters flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 [&>button]:min-h-7 [&>button]:rounded-none [&>button]:bg-transparent [&>button]:px-0 [&>button]:py-1 [&>button]:text-xs [&>button]:font-normal [&>button]:text-quiet [&>button.selected]:text-mint">
-                    <Button
-                      variant="bare"
-                      classList={{ selected: !tag() }}
-                      onClick={() => setTag("")}
+              <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
+                <div class="heading-line flex items-baseline gap-3">
+                  <span class="page-symbol flex size-7 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
+                    {list() === "Inbox" ? (
+                      <Inbox />
+                    ) : list() === "Today" ? (
+                      <Star />
+                    ) : list() === "Upcoming" ? (
+                      <CalendarDays />
+                    ) : list() === "Trash" ? (
+                      <Trash2 />
+                    ) : list() === "Logbook" ? (
+                      <BookOpen />
+                    ) : current() && isProject(current()!) ? (
+                      <ProjectProgress project={current()!} />
+                    ) : current()?.kind.startsWith("Area") ? (
+                      <AreaIcon />
+                    ) : (
+                      <Layers />
+                    )}
+                  </span>
+                  <h1 class="min-w-0 font-serif text-4xl leading-tight font-medium tracking-tight wrap-anywhere [&_[data-motion-word]]:inline-block">
+                    <For
+                      each={(query()
+                        ? "Search results"
+                        : current()
+                          ? title(current()!)
+                          : list()
+                      ).split(" ")}
                     >
-                      All
-                    </Button>
-                    <For each={filterTags()}>
-                      {(t) => (
-                        <Button
-                          variant="bare"
-                          classList={{ selected: tag() === t.id }}
-                          onClick={() => setTag(tag() === t.id ? "" : t.id)}
-                        >
-                          {title(t)}
-                        </Button>
+                      {(word) => (
+                        <span data-motion-word>
+                          {word}
+                          {"\u00a0"}
+                        </span>
+                      )}
+                    </For>
+                  </h1>
+                </div>
+                <Show when={current() && isProject(current()!)}>
+                  <Textarea
+                    variant="plain"
+                    autosize
+                    class="project-notes mt-3 block min-h-8 w-full px-0 py-1 text-sm leading-relaxed text-muted"
+                    rows="1"
+                    aria-label="Project notes"
+                    placeholder="Add notes to this project…"
+                    value={noteText(current()!)}
+                    onChange={(e) =>
+                      void patch(current()!, { nt: e.currentTarget.value })
+                    }
+                  />
+                </Show>
+                <div class="header-controls mt-3 flex items-start gap-2.5 empty:hidden">
+                  <Show when={current()}>
+                    <div class="list-tag-editor shrink-0">
+                      <TagPicker
+                        label="List tags"
+                        compact
+                        tags={tags()}
+                        selected={refs(current()!, "tg")}
+                        change={(ids) => void patch(current()!, { tg: ids })}
+                        create={createTag}
+                      />
+                    </div>
+                  </Show>
+                  <Show when={filterTags().length}>
+                    <div class="tag-filters flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <Pill selected={!tag()} onClick={() => setTag("")}>
+                        All
+                      </Pill>
+                      <For each={filterTags()}>
+                        {(t) => (
+                          <Pill
+                            selected={tag() === t.id}
+                            onClick={() => setTag(tag() === t.id ? "" : t.id)}
+                          >
+                            {title(t)}
+                          </Pill>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
+                <div
+                  class="page-divider absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-highlight/40 via-orchid/15 via-20% to-transparent"
+                  aria-hidden="true"
+                />
+              </header>
+              <Show
+                when={!loading()}
+                fallback={
+                  <div class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed">
+                    <span class="loader m-5 size-5 animate-spin rounded-full border-2 border-quiet border-t-accent" />
+                    Opening your workspace…
+                  </div>
+                }
+              >
+                <Show
+                  when={items().length}
+                  fallback={
+                    <div
+                      class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
+                      classList={{ "symbol-only": !query() }}
+                      role="status"
+                      aria-label={
+                        query()
+                          ? "No matching to-dos"
+                          : `${current() ? title(current()!) : list()} is empty`
+                      }
+                    >
+                      <div class="empty-symbol mb-3 grid size-16 place-items-center rounded-full text-mint opacity-75 [&>svg]:stroke-1">
+                        <Dynamic
+                          component={
+                            query()
+                              ? Search
+                              : navIcons[
+                                  lists.findIndex((name) => name === list())
+                                ] || Inbox
+                          }
+                          size={84}
+                          fill={list() === "Today" ? "currentColor" : "none"}
+                        />
+                      </div>
+                      <Show when={query()}>
+                        <h2>Nothing found</h2>
+                        <p>Try a different title or a few words from a note.</p>
+                      </Show>
+                    </div>
+                  }
+                >
+                  <div class="task-list" role="list" aria-label="To-dos">
+                    <For each={items()}>
+                      {(item, index) => (
+                        <>
+                          <Show
+                            when={
+                              current() &&
+                              item.props.ss &&
+                              !items()[index() - 1]?.props.ss
+                            }
+                          >
+                            <ListVisibility />
+                          </Show>
+                          <Show
+                            when={
+                              group(item) &&
+                              group(item) !==
+                                group(
+                                  items()[index() - 1] || {
+                                    id: "",
+                                    kind: "",
+                                    props: {},
+                                  },
+                                )
+                            }
+                          >
+                            <div class="list-group-heading my-1 flex items-center gap-2 py-1 pt-2 text-xs leading-4 font-medium text-mint first:mt-0 first:pt-0">
+                              {group(item) === "This Evening" && (
+                                <Moon size={16} />
+                              )}
+                              <span>{group(item)}</span>
+                            </div>
+                          </Show>
+                          <Show
+                            when={editing() === item.id}
+                            fallback={
+                              <TaskRow
+                                item={item}
+                                all={all()}
+                                selected={selection().includes(item.id)}
+                                name={editorSaves.drafts
+                                  .get(item.id)
+                                  ?.read()
+                                  .name.trim()}
+                                showContainer={!current()}
+                                dropEdge={
+                                  dropTarget()?.id === item.id
+                                    ? dropTarget()!.after
+                                      ? "after"
+                                      : "before"
+                                    : undefined
+                                }
+                                focus={() => {
+                                  if (
+                                    !editing() &&
+                                    !selection().includes(item.id)
+                                  )
+                                    setSelected(item.id);
+                                }}
+                                open={(e) => {
+                                  if (Date.now() < suppressRowClickUntil)
+                                    return;
+                                  if (e.metaKey || e.ctrlKey || e.shiftKey)
+                                    selectItem(item, e);
+                                  else openItem(item);
+                                }}
+                                complete={(cancel) =>
+                                  void run(() => complete(item, cancel))
+                                }
+                                context={(e) => openTaskMenu(item, e)}
+                                dragStart={(e) => {
+                                  setDragging(item.id);
+                                  if (!selection().includes(item.id))
+                                    setSelected(item.id);
+                                  if (e.dataTransfer) {
+                                    e.dataTransfer.effectAllowed = "move";
+                                    e.dataTransfer.setData(
+                                      "text/plain",
+                                      item.id,
+                                    );
+                                  }
+                                }}
+                                dragEnd={() => {
+                                  setDragging("");
+                                  setDropTarget(null);
+                                  suppressRowClickUntil = Date.now() + 250;
+                                }}
+                                dragOver={(e) => {
+                                  e.preventDefault();
+                                  if (e.dataTransfer)
+                                    e.dataTransfer.dropEffect = "move";
+                                  const r =
+                                    e.currentTarget.getBoundingClientRect();
+                                  setDropTarget({
+                                    id: item.id,
+                                    after: e.clientY > r.y + r.height / 2,
+                                  });
+                                }}
+                                dragLeave={(e) => {
+                                  if (
+                                    !e.currentTarget.contains(
+                                      e.relatedTarget as Node,
+                                    )
+                                  )
+                                    setDropTarget(null);
+                                }}
+                                drop={(e) => rowDrop(e, item)}
+                                schedule={
+                                  <DatePicker
+                                    compact
+                                    iconOnly
+                                    kind="when"
+                                    reminder={
+                                      pref("reminders", {})[
+                                        state().account + ":" + item.id
+                                      ] || ""
+                                    }
+                                    changeReminder={(value) =>
+                                      void saveReminder(item, value)
+                                    }
+                                    value={date(
+                                      item.props.sr || item.props.tir,
+                                    )}
+                                    mode={
+                                      isSomeday(item)
+                                        ? "Someday"
+                                        : item.props.sr || item.props.tir
+                                          ? "Date"
+                                          : item.props.st
+                                            ? "Anytime"
+                                            : "Inbox"
+                                    }
+                                    change={(value, mode) =>
+                                      void patch(
+                                        item,
+                                        schedule(mode || "Date", value),
+                                      )
+                                    }
+                                  />
+                                }
+                              />
+                            }
+                          >
+                            <Show
+                              when={isHeading(item)}
+                              fallback={<Editor item={item} />}
+                            >
+                              <HeadingEditor item={item} />
+                            </Show>
+                          </Show>
+                        </>
                       )}
                     </For>
                   </div>
                 </Show>
-              </div>
-              <div
-                class="page-divider absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-highlight/40 via-orchid/15 via-20% to-transparent"
-                aria-hidden="true"
-              />
-            </header>
-            <Show
-              when={!loading()}
-              fallback={
-                <div class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed">
-                  <span class="loader m-5 size-5 animate-spin rounded-full border-2 border-quiet border-t-accent" />
-                  Opening your workspace…
-                </div>
-              }
-            >
+              </Show>
               <Show
-                when={items().length}
-                fallback={
-                  <div
-                    class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
-                    classList={{ "symbol-only": !query() }}
-                    role="status"
-                    aria-label={
-                      query()
-                        ? "No matching to-dos"
-                        : `${current() ? title(current()!) : list()} is empty`
-                    }
+                when={current() && !items().some((item) => !!item.props.ss)}
+              >
+                <ListVisibility />
+              </Show>
+            </section>
+            <footer class="list-footer relative order-2 flex h-12 shrink-0 items-center justify-center gap-3 border-t border-hover px-4 text-xs text-quiet">
+              <span class="sr-only" aria-live="polite">
+                {selection().length} item{selection().length === 1 ? "" : "s"}{" "}
+                selected
+              </span>
+              <div ref={setEditorFooter} class="editor-footer-slot contents" />
+              <Show when={!editing() || !editorActions()}>
+                <ActionBar class="footer-actions">
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    class="footer-add text-accent"
+                    aria-label="New to-do"
+                    title="New to-do (⌘ N)"
+                    onClick={() => beginCreate("To-Do")}
                   >
-                    <div class="empty-symbol mb-3 grid size-16 place-items-center rounded-full text-mint opacity-75 [&>svg]:stroke-1">
-                      <Dynamic
-                        component={
-                          query()
-                            ? Search
-                            : navIcons[
-                                lists.findIndex((name) => name === list())
-                              ] || Inbox
+                    <Plus size={18} />
+                  </IconButton>
+                  <div class="footer-schedule">
+                    <Show
+                      when={chosen() && !editing()}
+                      fallback={
+                        <IconButton
+                          size="compact"
+                          variant="quiet"
+                          aria-label="Schedule selected item"
+                          disabled={!chosen() || isHeading(chosen()!)}
+                          onClick={() =>
+                            document
+                              .querySelector<HTMLButtonElement>(
+                                '.task-editor [aria-label="When"]',
+                              )
+                              ?.click()
+                          }
+                        >
+                          <CalendarDays size={16} />
+                        </IconButton>
+                      }
+                    >
+                      <DatePicker
+                        iconOnly
+                        compact
+                        kind="when"
+                        value={date(chosen()?.props.sr || chosen()?.props.tir)}
+                        reminder={
+                          chosen()
+                            ? pref("reminders", {})[
+                                `${state().account}:${chosen()!.id}`
+                              ] || ""
+                            : ""
                         }
-                        size={84}
-                        fill={list() === "Today" ? "currentColor" : "none"}
+                        changeReminder={(value) =>
+                          chosen() && void saveReminder(chosen()!, value)
+                        }
+                        change={(value, mode) =>
+                          void patchSelection(schedule(mode || "Date", value))
+                        }
                       />
-                    </div>
-                    <Show when={query()}>
-                      <h2>Nothing found</h2>
-                      <p>Try a different title or a few words from a note.</p>
                     </Show>
                   </div>
-                }
-              >
-                <div class="task-list" role="list" aria-label="To-dos">
-                  <For each={items()}>
-                    {(item, index) => (
-                      <>
-                        <Show
-                          when={
-                            current() &&
-                            item.props.ss &&
-                            !items()[index() - 1]?.props.ss
-                          }
-                        >
-                          <ListVisibility />
-                        </Show>
-                        <Show
-                          when={
-                            group(item) &&
-                            group(item) !==
-                              group(
-                                items()[index() - 1] || {
-                                  id: "",
-                                  kind: "",
-                                  props: {},
-                                },
-                              )
-                          }
-                        >
-                          <div class="list-group-heading my-1 flex items-center gap-2 py-1 pt-2 text-xs leading-4 font-medium text-mint first:mt-0 first:pt-0">
-                            {group(item) === "This Evening" && (
-                              <Moon size={16} />
-                            )}
-                            <span>{group(item)}</span>
-                          </div>
-                        </Show>
-                        <Show
-                          when={editing() === item.id}
-                          fallback={
-                            <div
-                              id={"item-" + item.id}
-                              role="listitem"
-                              tabindex="0"
-                              class="task-row group/task relative grid min-h-9 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 rounded-lg px-0 py-1 outline-none transition-colors hover:bg-hover compact:min-h-8 [&.selected]:bg-linear-to-br [&.selected]:from-mint/5 [&.selected]:to-selection [&.project-row]:hover:bg-linear-to-br [&.project-row]:hover:from-mint/5 [&.project-row]:hover:to-selection [&.logged]:grid-cols-[--spacing(7)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-5.5 [&.heading]:mb-1.5 [&.heading]:flex [&.heading]:border-0 [&.heading]:p-0 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-0 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
-                              classList={{
-                                selected: selected() === item.id,
-                                completed: item.props.ss === 3,
-                                cancelled: item.props.ss === 2,
-                                logged: !!item.props.ss,
-                                later: later(item) && !item.props.ss,
-                                "project-row": isProject(item),
-                                heading: isHeading(item),
-                              }}
-                              draggable="true"
-                              onFocus={(e) => {
-                                if (e.target === e.currentTarget && !editing())
-                                  setSelected(item.id);
-                              }}
-                              data-drop-edge={
-                                dropTarget()?.id === item.id
-                                  ? dropTarget()!.after
-                                    ? "after"
-                                    : "before"
-                                  : undefined
-                              }
-                              onDragStart={(e) => {
-                                setDragging(item.id);
-                                setSelected(item.id);
-                                if (e.dataTransfer) {
-                                  e.dataTransfer.effectAllowed = "move";
-                                  e.dataTransfer.setData("text/plain", item.id);
-                                }
-                              }}
-                              onDragEnd={() => {
-                                setDragging("");
-                                setDropTarget(null);
-                                suppressRowClickUntil = Date.now() + 250;
-                              }}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                if (e.dataTransfer)
-                                  e.dataTransfer.dropEffect = "move";
-                                const r =
-                                  e.currentTarget.getBoundingClientRect();
-                                setDropTarget({
-                                  id: item.id,
-                                  after: e.clientY > r.y + r.height / 2,
-                                });
-                              }}
-                              onDragLeave={(e) => {
-                                if (
-                                  !e.currentTarget.contains(
-                                    e.relatedTarget as Node,
-                                  )
-                                )
-                                  setDropTarget(null);
-                              }}
-                              onDrop={(e) => rowDrop(e, item)}
-                              onClick={(e) => {
-                                if (Date.now() < suppressRowClickUntil) return;
-                                if (
-                                  !(e.target as HTMLElement).closest(
-                                    "button,input,[data-row-control]",
-                                  )
-                                )
-                                  openItem(item);
-                              }}
-                              onKeyDown={(e) => {
-                                if (
-                                  e.key === "Enter" &&
-                                  e.target === e.currentTarget
-                                ) {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  openItem(item);
-                                }
-                              }}
-                            >
-                              <Show when={!isHeading(item)}>
-                                <Button
-                                  variant="bare"
-                                  class="task-check size-4 min-h-4 shrink-0 justify-self-center rounded border border-quiet p-0 text-accent transition-colors hover:border-accent hover:bg-selection [&.project]:size-4.5 [&.project]:rounded-full [&.project]:border-0 group-[.later]/task:border-dashed group-[.completed]/task:border-mint group-[.completed]/task:bg-mint group-[.completed]/task:text-bg group-[.cancelled]/task:border-quiet group-[.cancelled]/task:bg-transparent group-[.cancelled]/task:text-quiet aria-pressed:border-mint aria-pressed:bg-mint aria-pressed:text-bg"
-                                  classList={{ project: isProject(item) }}
-                                  aria-label={`${item.props.ss ? "Reopen" : "Complete"} ${title(item)}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void run(() => complete(item, e.altKey));
-                                  }}
-                                >
-                                  {item.props.ss ? (
-                                    item.props.ss === 2 ? (
-                                      <X size={13} />
-                                    ) : (
-                                      <Check size={13} />
-                                    )
-                                  ) : isProject(item) ? (
-                                    <ProjectProgress project={item} />
-                                  ) : null}
-                                </Button>
-                              </Show>
-                              <Show when={item.props.ss}>
-                                <span
-                                  class="logged-date text-xs font-medium whitespace-nowrap text-accent tabular-nums"
-                                  title={
-                                    item.props.ss === 2
-                                      ? "Cancelled"
-                                      : "Completed"
-                                  }
-                                >
-                                  {item.props.sp
-                                    ? new Date(
-                                        item.props.sp * 1000,
-                                      ).toLocaleDateString("en", {
-                                        month: "short",
-                                        day: "numeric",
-                                      })
-                                    : "Date unavailable"}
-                                </span>
-                              </Show>
-                              <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1">
-                                <div class="task-summary flex min-w-0 items-center gap-2">
-                                  <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">
-                                    {editorSaves.drafts
-                                      .get(item.id)
-                                      ?.read()
-                                      .name.trim() || title(item)}
-                                  </span>
-                                  <Show when={isProject(item)}>
-                                    <span class="project-task-count ml-1 text-xs leading-5 text-muted">
-                                      {item.props.ss
-                                        ? projectStats(item, all()).total
-                                        : projectStats(item, all()).remaining}
-                                    </span>
-                                  </Show>
-                                  <div class="task-meta flex min-w-0 max-w-70 shrink-0 items-center gap-2 text-xs text-quiet max-lg:max-w-36 max-lg:gap-1.5">
-                                    <For each={refs(item, "tg")}>
-                                      {(id) => (
-                                        <span class="row-tag max-w-24 truncate rounded-full bg-ink/7 px-1.5 text-xs text-muted max-lg:max-w-16">
-                                          {title(
-                                            tags().find((t) => t.id === id) || {
-                                              id,
-                                              kind: "Tag4",
-                                              props: { tt: "Tag" },
-                                            },
-                                          )}
-                                        </span>
-                                      )}
-                                    </For>
-                                    <Show when={refs(item, "rt").length}>
-                                      <Repeat2 size={13} />
-                                    </Show>
-                                    <Show when={noteText(item)}>
-                                      <span
-                                        class="note-lines"
-                                        title="Has notes"
-                                      >
-                                        <FileText size={13} />
-                                      </span>
-                                    </Show>
-                                    <Show
-                                      when={all().some((e) =>
-                                        refs(e, "ts").includes(item.id),
-                                      )}
-                                    >
-                                      <span class="checklist-count font-mono text-xs">
-                                        {
-                                          all().filter(
-                                            (e) =>
-                                              refs(e, "ts").includes(item.id) &&
-                                              e.props.ss === 3,
-                                          ).length
-                                        }
-                                        /
-                                        {
-                                          all().filter((e) =>
-                                            refs(e, "ts").includes(item.id),
-                                          ).length
-                                        }
-                                      </span>
-                                    </Show>
-                                    <Show when={item.props.dd}>
-                                      <span
-                                        class="deadline flex items-center gap-1 whitespace-nowrap text-deadline [&.overdue]:text-danger"
-                                        classList={{
-                                          overdue: item.props.dd < today(),
-                                        }}
-                                      >
-                                        <Flag size={11} />
-                                        {new Date(
-                                          item.props.dd * 1000,
-                                        ).toLocaleDateString("en", {
-                                          month: "short",
-                                          day: "numeric",
-                                          timeZone: "UTC",
-                                        })}
-                                      </span>
-                                    </Show>
-                                    <Show
-                                      when={!item.props.ss && !isHeading(item)}
-                                    >
-                                      <div
-                                        data-row-control
-                                        class="row-schedule opacity-0 group-hover/task:opacity-100 group-focus-within/task:opacity-100 group-[.later]/task:opacity-100"
-                                        onClick={(e) => e.stopPropagation()}
-                                        role="group"
-                                        aria-label={`Schedule ${title(item)}`}
-                                      >
-                                        <DatePicker
-                                          compact
-                                          iconOnly
-                                          kind="when"
-                                          reminder={
-                                            pref("reminders", {})[
-                                              `${state().account}:${item.id}`
-                                            ] || ""
-                                          }
-                                          changeReminder={(value) =>
-                                            void saveReminder(item, value)
-                                          }
-                                          value={date(
-                                            item.props.sr || item.props.tir,
-                                          )}
-                                          mode={
-                                            item.props.st === 2 &&
-                                            !(item.props.sr || item.props.tir)
-                                              ? "Someday"
-                                              : item.props.sr || item.props.tir
-                                                ? "Date"
-                                                : item.props.st
-                                                  ? "Anytime"
-                                                  : "Inbox"
-                                          }
-                                          change={(value, mode) =>
-                                            void patch(
-                                              item,
-                                              schedule(mode || "Date", value),
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                    </Show>
-                                    <Show when={selected() === item.id}>
-                                      <IconButton
-                                        aria-label={`Edit ${title(item)}`}
-                                        onClick={() => editItem(item)}
-                                      >
-                                        <MoreHorizontal size={17} />
-                                      </IconButton>
-                                    </Show>
-                                  </div>
-                                </div>
-                                <Show
-                                  when={!current() && container(item, all())}
-                                >
-                                  <span class="container-label max-w-full truncate text-xs leading-4 text-quiet">
-                                    {container(item, all())}
-                                  </span>
-                                </Show>
-                              </div>
-                            </div>
-                          }
-                        >
-                          <Show
-                            when={isHeading(item)}
-                            fallback={<Editor item={item} />}
-                          >
-                            <HeadingEditor item={item} />
-                          </Show>
-                        </Show>
-                      </>
-                    )}
-                  </For>
-                </div>
-              </Show>
-            </Show>
-            <Show when={current() && !items().some((item) => !!item.props.ss)}>
-              <ListVisibility />
-            </Show>
-          </section>
-          <footer class="list-footer relative order-2 flex h-12 shrink-0 items-center justify-center gap-3 border-t border-hover px-4 text-xs text-quiet">
-            <div ref={setEditorFooter} class="editor-footer-slot contents" />
-            <Show when={!editing() || !editorActions()}>
-              <div class="footer-actions grid grid-cols-4 items-center justify-items-center gap-3 [&>*]:w-16 [&>button]:w-7">
-                <IconButton
-                  size="compact"
-                  variant="quiet"
-                  class="footer-add text-accent"
-                  aria-label="New to-do"
-                  title="New to-do (⌘ N)"
-                  onClick={() => beginCreate("To-Do")}
-                >
-                  <Plus size={18} />
-                </IconButton>
-                <div class="footer-schedule">
-                  <Show
-                    when={chosen() && !editing()}
-                    fallback={
-                      <IconButton
-                        size="compact"
-                        variant="quiet"
-                        aria-label="Schedule selected item"
-                        disabled={!chosen() || isHeading(chosen()!)}
-                        onClick={() =>
-                          document
-                            .querySelector<HTMLButtonElement>(
-                              '.task-editor [aria-label="When"]',
-                            )
-                            ?.click()
-                        }
-                      >
-                        <CalendarDays size={16} />
-                      </IconButton>
-                    }
-                  >
-                    <DatePicker
-                      iconOnly
-                      compact
-                      kind="when"
-                      value={date(chosen()?.props.sr || chosen()?.props.tir)}
-                      reminder={
-                        chosen()
-                          ? pref("reminders", {})[
-                              `${state().account}:${chosen()!.id}`
-                            ] || ""
-                          : ""
-                      }
-                      changeReminder={(value) =>
-                        chosen() && void saveReminder(chosen()!, value)
-                      }
-                      change={(value, mode) =>
-                        void patch(chosen()!, schedule(mode || "Date", value))
-                      }
-                    />
-                  </Show>
-                </div>
-                <IconButton
-                  size="compact"
-                  variant="quiet"
-                  aria-label="Move selected item"
-                  disabled={!chosen() || isHeading(chosen()!)}
-                  onClick={() =>
-                    editing() ? editorActions()?.move() : setMoving(true)
-                  }
-                >
-                  <ArrowRight size={16} />
-                </IconButton>
-                <IconButton
-                  size="compact"
-                  variant="quiet"
-                  aria-label="Quick Find"
-                  onClick={() => openFind()}
-                >
-                  <Search size={16} />
-                </IconButton>
-              </div>
-              <Show when={chosen()}>
-                <div class="footer-selection-actions absolute right-3.5 flex gap-1">
                   <IconButton
                     size="compact"
                     variant="quiet"
-                    aria-label="Trash selected item"
-                    onClick={() => void run(() => remove(chosen()!))}
-                  >
-                    <Trash2 size={16} />
-                  </IconButton>
-                  <IconButton
-                    size="compact"
-                    variant="quiet"
-                    aria-label="Selected item actions"
+                    aria-label="Move selected item"
+                    disabled={!chosen() || isHeading(chosen()!)}
                     onClick={() =>
-                      editing() ? editorActions()?.more() : editItem(chosen()!)
+                      editing() ? editorActions()?.move() : setMoving(true)
                     }
                   >
-                    <MoreHorizontal size={17} />
+                    <ArrowRight size={16} />
                   </IconButton>
-                </div>
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    aria-label="Quick Find"
+                    onClick={() => openFind()}
+                  >
+                    <Search size={16} />
+                  </IconButton>
+                </ActionBar>
+                <Show when={chosen()}>
+                  <div class="footer-selection-actions absolute right-3.5 flex gap-1">
+                    <IconButton
+                      size="compact"
+                      variant="quiet"
+                      aria-label="Trash selected item"
+                      onClick={() => void removeSelection()}
+                    >
+                      <Trash2 size={16} />
+                    </IconButton>
+                    <IconButton
+                      size="compact"
+                      variant="quiet"
+                      aria-label="Selected item actions"
+                      onClick={() =>
+                        editing()
+                          ? editorActions()?.more()
+                          : openTaskMenu(chosen()!)
+                      }
+                    >
+                      <MoreHorizontal size={17} />
+                    </IconButton>
+                  </div>
+                </Show>
+                <Show when={undo() && !chosen()}>
+                  <Button
+                    size="compact"
+                    variant="quiet"
+                    class="footer-undo absolute left-3"
+                    onClick={() =>
+                      void run(async () => {
+                        await mutate(undo()!, true, false);
+                        setUndo(null);
+                      })
+                    }
+                  >
+                    Undo
+                  </Button>
+                </Show>
               </Show>
-              <Show when={undo() && !chosen()}>
-                <Button
-                  size="compact"
-                  variant="quiet"
-                  class="footer-undo absolute left-3"
-                  onClick={() =>
-                    void run(async () => {
-                      await mutate(undo()!, true, false);
-                      setUndo(null);
-                    })
-                  }
-                >
-                  Undo
-                </Button>
-              </Show>
-            </Show>
-          </footer>
+            </footer>
+          </Show>
           <Show when={notice()}>
             <div
               role="status"
@@ -2071,6 +2185,51 @@ export default function App() {
             </div>
           </Show>
         </main>
+        <Show when={taskMenu() && chosen()}>
+          <MenuPopup
+            label="Task actions"
+            point={taskMenu()!}
+            close={closeTaskMenu}
+          >
+            <TaskMenu
+              multiple={selection().length > 1}
+              project={isProject(chosen()!)}
+              inProject={selectedItems().some(
+                (item) => refs(item, "pr").length > 0,
+              )}
+              close={closeTaskMenu}
+              action={taskAction}
+            />
+          </MenuPopup>
+        </Show>
+        <Show when={batchEdit()}>
+          <BatchTaskEdit />
+        </Show>
+        <Show when={infoItem()}>
+          <Dialog title="To-Do Info" close={() => setInfoItem(null)}>
+            <p class="mb-5 text-base font-medium">{title(infoItem()!)}</p>
+            <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+              <For
+                each={[
+                  ["Created", infoItem()!.props.cd],
+                  ["Modified", infoItem()!.props.md],
+                  ["Completed", infoItem()!.props.sp],
+                ]}
+              >
+                {([label, timestamp]) => (
+                  <Show when={timestamp}>
+                    <dt class="text-muted">{label}</dt>
+                    <dd>
+                      {new Date(Number(timestamp) * 1000).toLocaleString()}
+                    </dd>
+                  </Show>
+                )}
+              </For>
+              <dt class="text-muted">In</dt>
+              <dd>{container(infoItem()!, all()) || "No Project"}</dd>
+            </dl>
+          </Dialog>
+        </Show>
         <Show when={findOpen()}>
           <QuickFind />
         </Show>
@@ -2083,7 +2242,7 @@ export default function App() {
               <Button
                 onClick={() =>
                   void run(async () => {
-                    await mutate(event(chosen()!, move(chosen()!, null)));
+                    await patchSelection((item) => move(item, null));
                     setMoving(false);
                   })
                 }
@@ -2102,7 +2261,7 @@ export default function App() {
                   <Button
                     onClick={() =>
                       void run(async () => {
-                        await mutate(event(chosen()!, move(chosen()!, dest)));
+                        await patchSelection((item) => move(item, dest));
                         setMoving(false);
                       })
                     }
@@ -2122,7 +2281,6 @@ export default function App() {
               setState(next);
               setConnectionOpen(false);
               setError("");
-              toast("Things Cloud connected");
             }}
             close={() => {
               setConnectionOpen(false);
@@ -2133,9 +2291,6 @@ export default function App() {
               });
             }}
           />
-        </Show>
-        <Show when={settings()}>
-          <SettingsDialog />
         </Show>
         <Show when={confirm()}>
           <Dialog
@@ -2219,32 +2374,7 @@ export default function App() {
     );
   }
   function ProjectProgress(props: { project: Entity }) {
-    const ratio = () => {
-      const stats = projectStats(props.project, all());
-      return stats.total ? stats.done / stats.total : 0;
-    };
-    return (
-      <svg
-        class="project-ring inline-block size-4 shrink-0 overflow-visible border-0 text-accent"
-        viewBox="0 0 20 20"
-        role="img"
-        aria-label={`${Math.round(ratio() * 100)}% complete`}
-      >
-        <circle
-          cx="10"
-          cy="10"
-          r="8"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-        />
-        <path
-          class="project-sector"
-          fill="currentColor"
-          d={projectProgressPath(ratio())}
-        />
-      </svg>
-    );
+    return <ProjectProgressIcon project={props.project} all={all()} />;
   }
   function ListVisibility() {
     const count = () =>
@@ -2270,6 +2400,58 @@ export default function App() {
       </div>
     );
   }
+  function BatchTaskEdit() {
+    const [sharedTags, setSharedTags] = createSignal(
+      tags()
+        .filter((tag) =>
+          selectedItems().every((item) => refs(item, "tg").includes(tag.id)),
+        )
+        .map((tag) => tag.id),
+    );
+    return (
+      <Dialog
+        title={`${batchEdit() === "tags" ? "Tags" : batchEdit() === "when" ? "When" : "Deadline"} · ${selection().length} to-dos`}
+        close={() => setBatchEdit(null)}
+      >
+        <Show
+          when={batchEdit() === "tags"}
+          fallback={
+            <DatePicker
+              kind={batchEdit() === "when" ? "when" : "deadline"}
+              value=""
+              change={(value, mode) => {
+                void patchSelection(
+                  batchEdit() === "when"
+                    ? schedule(mode || "Date", value)
+                    : { dd: value ? day(value) : null },
+                );
+                setBatchEdit(null);
+              }}
+            />
+          }
+        >
+          <TagPicker
+            tags={tags()}
+            selected={sharedTags()}
+            create={createTag}
+            change={(ids) => {
+              const removed = sharedTags().filter((id) => !ids.includes(id)),
+                added = ids.filter((id) => !sharedTags().includes(id));
+              setSharedTags(ids);
+              void patchSelection((item) => ({
+                tg: [
+                  ...new Set([
+                    ...refs(item, "tg").filter((id) => !removed.includes(id)),
+                    ...added,
+                  ]),
+                ],
+              }));
+            }}
+          />
+        </Show>
+      </Dialog>
+    );
+  }
   function HeadingEditor(props: { item: Entity }) {
     const item = props.item;
     const [name, setName] = createSignal(
@@ -2286,6 +2468,13 @@ export default function App() {
     const save = () => {
       const snapshot = read();
       if (!snapshot.name.trim()) return false;
+      if (
+        snapshot.name.trim() === item.props.tt &&
+        all().some((saved) => saved.id === item.id)
+      ) {
+        discardEditor();
+        return Promise.resolve(true);
+      }
       return persistEditor(session, async () => {
         await mutate(
           !all().some((saved) => saved.id === item.id)
@@ -2400,6 +2589,7 @@ export default function App() {
       const entry = entries()[index];
       if (!entry) return;
       setFindOpen(false);
+      setSettings(false);
       if (!entry.item) {
         navigate(entry.id);
         return;
@@ -2567,7 +2757,6 @@ export default function App() {
           setSelected(id);
           if (kind() === "To-Do") setEditing(id);
         }
-        toast("Created");
       });
       setSaving(false);
     }
@@ -2656,7 +2845,7 @@ export default function App() {
             ? item.props.sb === 1
               ? "This Evening"
               : "Today"
-            : item.props.sr
+            : item.props.sr || item.props.tir
               ? "Date"
               : item.props.st === 2
                 ? "Someday"
@@ -2725,6 +2914,22 @@ export default function App() {
       destination: destination(),
       convert: conversion,
     });
+    const initialDraft = read();
+    const fields = (value: typeof initialDraft, saved: Entity): Props => ({
+      tt: value.name.trim(),
+      ...(value.convert ? { tp: 1 } : {}),
+      nt: value.notes,
+      ...move(saved, all().find((e) => e.id === value.destination) || null),
+      ...schedule(
+        value.mode === "Inbox" && value.destination ? "Anytime" : value.mode,
+        value.start,
+      ),
+      ss: value.status,
+      sp: value.status ? saved.props.sp || Date.now() / 1000 : null,
+      dd: value.deadline ? day(value.deadline) : null,
+      tg: value.tags,
+    });
+    const initialFields = fields(initialDraft, item);
     const session = editorSaves.retain(item, read);
     currentEditor = session;
     let editor!: HTMLDivElement;
@@ -2738,6 +2943,7 @@ export default function App() {
           editor
             .querySelector<HTMLButtonElement>(".editor-more > button")
             ?.click(),
+        action: handleAction,
       }),
     );
     onCleanup(() => {
@@ -2779,6 +2985,54 @@ export default function App() {
       const saved = all().find((e) => e.id === item.id) || item;
       return all().find((e) => e.id === refs(saved, "rt")[0]);
     };
+    function handleAction(action: TaskAction) {
+      if (["when", "tags", "deadline"].includes(action)) {
+        editor
+          .querySelector<HTMLButtonElement>(
+            `[aria-label="${action === "when" ? "When" : action === "tags" ? "Tags" : "Deadline"}"]`,
+          )
+          ?.click();
+      } else if (action === "move")
+        editor
+          .querySelector<HTMLButtonElement>(".editor-move > button")
+          ?.click();
+      else if (action === "repeat") setRepeatOpen(true);
+      else if (action === "info") setInfoItem(item);
+      else if (action === "convert") void save(true);
+      else if (action === "delete") void run(() => remove(item));
+      else if (action === "share") void shareTask(name(), notes());
+      else if (action === "removeProject")
+        setDestination(refs(item, "ar")[0] || "");
+      else if (action === "showProject")
+        void run(async () => {
+          if (await save()) navigate(refs(item, "pr")[0]);
+        });
+      else if (action === "duplicate")
+        void run(async () => {
+          if (await save()) {
+            const saved = all().find((e) => e.id === item.id);
+            if (saved) await duplicate(saved);
+          }
+        });
+      else if (["complete", "cancel", "reopen"].includes(action)) {
+        setStatus(action === "complete" ? 3 : action === "cancel" ? 2 : 0);
+        void save();
+      } else {
+        const modes = {
+          today: "Today",
+          evening: "This Evening",
+          anytime: "Anytime",
+          someday: "Someday",
+        };
+        const mode = modes[action as keyof typeof modes];
+        if (mode) {
+          setMode(mode);
+          setStart(
+            mode === "Today" || mode === "This Evening" ? date(today()) : "",
+          );
+        }
+      }
+    }
     let inFlight: Promise<boolean | undefined> | undefined;
     function save(
       convert = false,
@@ -2801,6 +3055,14 @@ export default function App() {
       conversion ||= convert;
       const snapshot = read();
       if (
+        !restored &&
+        all().some((saved) => saved.id === item.id) &&
+        JSON.stringify(snapshot) === JSON.stringify(initialDraft)
+      ) {
+        discardEditor();
+        return Promise.resolve(true);
+      }
+      if (
         snapshot.repeat &&
         recurring() &&
         recurring()!.id !== snapshot.repeatId
@@ -2814,43 +3076,42 @@ export default function App() {
         const existingChecks = all().filter((e) =>
           refs(e, "ts").includes(item.id),
         );
-        const p: Props = {
-          tt: snapshot.name.trim(),
-          ...(snapshot.convert ? { tp: 1 } : {}),
-          nt: snapshot.notes,
-          ...move(
-            savedItem,
-            all().find((e) => e.id === snapshot.destination) || null,
-          ),
-          ...schedule(
-            snapshot.mode === "Inbox" && snapshot.destination
-              ? "Anytime"
-              : snapshot.mode,
-            snapshot.start,
-          ),
-          ss: snapshot.status,
-          sp: snapshot.status ? savedItem.props.sp || Date.now() / 1000 : null,
-          dd: snapshot.deadline ? day(snapshot.deadline) : null,
-          tg: snapshot.tags,
-        };
+        const p = fields(snapshot, savedItem);
+        const existing = all().some((saved) => saved.id === item.id);
+        if (existing && !restored)
+          for (const key of Object.keys(p))
+            if (JSON.stringify(p[key]) === JSON.stringify(initialFields[key]))
+              delete p[key];
         const changes: Changes = !all().some((saved) => saved.id === item.id)
           ? { [item.id]: { e: item.kind, t: 0, p: { ...item.props, ...p } } }
-          : event(savedItem, p);
+          : Object.keys(p).length
+            ? event(savedItem, p)
+            : {};
         for (const c of snapshot.checks) {
           const old = existingChecks.find((e) => e.id === c.id);
-          if (c.title.trim())
+          if (c.title.trim()) {
             changes[c.id] = {
               e: c.kind,
               t: old ? 1 : 0,
               p: {
                 tt: c.title.trim(),
                 ss: c.done ? 3 : 0,
-                sp: c.done ? Date.now() / 1000 : null,
+                sp: c.done ? old?.props.sp || Date.now() / 1000 : null,
                 ix: snapshot.checks.indexOf(c) * 1024,
                 ts: [item.id],
               },
             };
-          else if (old) changes[c.id] = { e: old.kind, t: 2, p: {} };
+            if (
+              old &&
+              changes[c.id] &&
+              Object.entries(changes[c.id].p).every(
+                ([key, value]) =>
+                  JSON.stringify(value) ===
+                  JSON.stringify(old.props[key] ?? null),
+              )
+            )
+              delete changes[c.id];
+          } else if (old) changes[c.id] = { e: old.kind, t: 2, p: {} };
         }
         for (const old of existingChecks)
           if (!snapshot.checks.some((c) => c.id === old.id))
@@ -2868,7 +3129,7 @@ export default function App() {
             );
           if (!existing) {
             const fu = Number(snapshot.repeat),
-              first = p.sr || today();
+              first = p.sr || savedItem.props.sr || today();
             const templateId = snapshot.repeatId;
             const d = new Date(first * 1000);
             const details =
@@ -2901,6 +3162,7 @@ export default function App() {
               icp: false,
             };
             changes[templateId] = { e: "Task6", t: 0, p: template };
+            changes[item.id] ||= { e: item.kind, t: 1, p: {} };
             changes[item.id].p = {
               ...changes[item.id].p,
               rt: [templateId],
@@ -2910,7 +3172,7 @@ export default function App() {
             };
           }
         }
-        await mutate(changes, true);
+        if (Object.keys(changes).length) await mutate(changes, true);
         const reminderKey = `${state().account}:${item.id}`;
         if ((pref("reminders", {})[reminderKey] || "") !== snapshot.reminder) {
           const reminders = { ...pref("reminders", {}) };
@@ -2928,7 +3190,6 @@ export default function App() {
           });
           if (snapshot.convert && close) navigate(item.id);
         }
-        toast("Saved");
         scheduleSync();
         return true;
       });
@@ -2947,7 +3208,7 @@ export default function App() {
     });
     return (
       <div
-        class="task-editor my-2.5 mb-4.5 flex flex-col gap-2 rounded-xl bg-linear-to-br from-editor-start to-editor-end px-4 py-3 shadow-xl outline-none max-sm:p-3 [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
+        class="task-editor relative -mx-4 mb-4 flex flex-col gap-2 rounded-xl bg-surface px-4 py-1 pb-3 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
         data-instant={instant || undefined}
         ref={editor}
         role="group"
@@ -2989,33 +3250,38 @@ export default function App() {
           }
         }}
       >
-        <div class="editor-title flex min-h-8 items-center gap-2.5 rounded-lg [&>input]:min-h-8 [&>input]:rounded-none [&>input]:px-0 [&>input]:py-1 [&>input]:text-base [&>input]:font-medium [&>input]:focus-visible:bg-transparent [&>input]:focus-visible:shadow-none">
-          <Button
-            variant="bare"
-            class="task-check size-4 min-h-4 shrink-0 justify-self-center rounded border border-quiet p-0 text-accent transition-colors hover:border-accent hover:bg-selection [&.project]:size-4.5 [&.project]:rounded-full [&.project]:border-0 group-[.later]/task:border-dashed group-[.completed]/task:border-mint group-[.completed]/task:bg-mint group-[.completed]/task:text-bg group-[.cancelled]/task:border-quiet group-[.cancelled]/task:bg-transparent group-[.cancelled]/task:text-quiet aria-pressed:border-mint aria-pressed:bg-mint aria-pressed:text-bg"
+        <div class="editor-title grid min-h-7 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 [&_input]:min-h-7 [&_input]:h-7 [&_input]:rounded-none [&_input]:px-0 [&_input]:py-0 [&_input]:text-sm [&_input]:font-normal [&_input]:focus-visible:bg-transparent [&_input]:focus-visible:shadow-none">
+          <CheckButton
             aria-label={status() ? "Reopen to-do" : "Complete to-do"}
-            aria-pressed={!!status()}
+            checked={!!status()}
+            canceled={status() === 2}
+            dashed={mode() === "Someday"}
             onClick={(e) => setStatus(status() ? 0 : e.altKey ? 2 : 3)}
-          >
-            <Show when={status()}>
-              <Check size={13} />
-            </Show>
-          </Button>
-          <Input
-            variant="plain"
-            autofocus
-            aria-label="To-do title"
-            value={name()}
-            onInput={(e) => setName(e.currentTarget.value)}
-            placeholder="New to-do"
           />
+          <div class="flex min-w-0 items-center gap-2">
+            <Show when={isDueToday(item)}>
+              <span
+                class="due-today size-2 shrink-0 rounded-full bg-highlight"
+                aria-label="Due today"
+              />
+            </Show>
+            <Input
+              variant="plain"
+              autofocus
+              aria-label="To-do title"
+              value={name()}
+              onInput={(e) => setName(e.currentTarget.value)}
+              placeholder="New to-do"
+            />
+          </div>
         </div>
-        <div class="editor-notes-block ml-7 min-w-0">
+        <div class="editor-notes-block ml-10 min-w-0">
           <Show
             when={previewNotes()}
             fallback={
               <Textarea
                 variant="plain"
+                autosize
                 class="editor-notes min-h-14 w-full rounded-lg px-0 py-1 text-sm leading-relaxed text-muted"
                 aria-label="Notes"
                 placeholder="Notes"
@@ -3028,7 +3294,7 @@ export default function App() {
           </Show>
         </div>
         <div
-          class="checklist ml-7 flex flex-col gap-1.5"
+          class="checklist ml-10 flex flex-col gap-1.5"
           hidden={!checks().length}
         >
           <For each={checks()}>
@@ -3123,7 +3389,7 @@ export default function App() {
             Checklist item
           </Button>
         </div>
-        <div class="editor-tools mt-1.5 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.date-picker:first-child]:mr-auto">
+        <div class="editor-tools ml-10 mt-1.5 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.date-picker:first-child]:mr-auto">
           <DatePicker
             compact
             kind="when"
@@ -3160,7 +3426,7 @@ export default function App() {
           />
         </div>
         <Show when={!item.props.rp && (repeatOpen() || recurring())}>
-          <div class="repeat-panel px-7 py-2.5 [&_.field]:my-2">
+          <div class="repeat-panel pl-10 pr-0 py-2.5 [&_.field]:my-2">
             <span class="muted text-muted">Repeat</span>
             <Field label="Frequency">
               <Select
@@ -3225,582 +3491,166 @@ export default function App() {
         <Show when={editorFooter()}>
           {(mount) => (
             <Portal mount={mount()}>
-              <div class="editor-footer flex flex-wrap items-center justify-center gap-12">
-                <Popover
-                  size="compact"
-                  iconOnly
-                  class="editor-move"
-                  label="Move to"
-                  trigger={<ArrowRight size={16} />}
-                >
-                  {(close) => (
-                    <>
-                      <div class="destination-list flex max-h-[50dvh] flex-col overflow-auto [&>button]:justify-start [&>button]:p-3 [&>button]:text-muted [&_small]:ml-auto [&_small]:text-quiet">
-                        <Button
-                          onClick={() => {
-                            setDestination("");
-                            setMode("Inbox");
-                            close();
-                          }}
-                        >
-                          <Inbox size={16} />
-                          Inbox
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setDestination("");
-                            if (mode() === "Inbox") setMode("Anytime");
-                            close();
-                          }}
-                        >
-                          <X size={16} />
-                          No Project
-                        </Button>
-                        <For
-                          each={all().filter(
-                            (e) =>
-                              (e.kind.startsWith("Area") ||
-                                isProject(e) ||
-                                isHeading(e)) &&
-                              active(e, all()) &&
-                              e.id !== item.id &&
-                              (!isProject(item) || e.kind.startsWith("Area")),
-                          )}
-                        >
-                          {(e) => (
-                            <Button
-                              onClick={() => {
-                                setDestination(e.id);
-                                if (mode() === "Inbox") setMode("Anytime");
-                                close();
-                              }}
-                            >
-                              <Folder size={16} />
-                              {title(e)}
-                            </Button>
-                          )}
-                        </For>
-                      </div>
-                    </>
-                  )}
-                </Popover>
-                <IconButton
-                  size="compact"
-                  variant="quiet"
-                  aria-label="Move to trash"
-                  onClick={() => void run(() => remove(item))}
-                >
-                  <Trash2 size={15} />
-                </IconButton>
-                <Popover
-                  size="compact"
-                  iconOnly
-                  class="editor-more"
-                  label="To-do actions"
-                  trigger={<MoreHorizontal size={18} />}
-                >
-                  {(close) => (
-                    <Menu close={close}>
-                      <MenuItem
-                        disabled={saving() || tagBusy() || !name().trim()}
-                        onClick={() => {
-                          close();
-                          void save();
-                        }}
-                      >
-                        Save edits <Kbd>⌘ ↵</Kbd>
-                      </MenuItem>
-                      <MenuItem
-                        onClick={() => {
-                          close();
-                          discardEditor();
-                        }}
-                      >
-                        Discard edits <Kbd>Esc</Kbd>
-                      </MenuItem>
-                      <MenuItem
-                        onClick={() => {
-                          setPreviewNotes((v) => !v);
-                          close();
-                        }}
-                      >
-                        {previewNotes() ? "Edit notes" : "Preview notes"}
-                      </MenuItem>
-                      <MenuItem
-                        onClick={() => {
-                          setRepeatOpen(true);
-                          close();
-                        }}
-                      >
-                        <Repeat2 size={16} />
-                        Repeat…
-                      </MenuItem>
-                      <MenuItem
-                        disabled={saving() || !name().trim()}
-                        onClick={() => {
-                          close();
-                          void run(async () => {
-                            if (await save()) {
-                              const saved = all().find((e) => e.id === item.id);
-                              if (saved) await duplicate(saved);
-                            }
-                          });
-                        }}
-                      >
-                        <Copy size={16} />
-                        Duplicate
-                      </MenuItem>
-                      <Show when={!isProject(item)}>
-                        <MenuItem
-                          disabled={saving() || !name().trim()}
-                          onClick={() => {
-                            close();
-                            void save(true);
-                          }}
-                        >
-                          <Folder size={16} />
-                          Convert to Project…
-                        </MenuItem>
-                      </Show>
-                      <MenuItem
-                        onClick={() => {
-                          close();
-                          void run(async () => {
-                            const text = [name(), notes()]
-                              .filter(Boolean)
-                              .join("\n\n");
-                            if (navigator.share)
-                              await navigator.share({ title: name(), text });
-                            else {
-                              await navigator.clipboard.writeText(text);
-                              toast("Copied to clipboard");
-                            }
-                          });
-                        }}
-                      >
-                        <Share2 size={16} />
-                        Share…
-                      </MenuItem>
-                      <Show when={!draft()}>
-                        <MenuItem
-                          onClick={() => {
-                            setStatus(status() === 2 ? 0 : 2);
-                            close();
-                          }}
-                        >
-                          <X size={16} />
-                          {status() === 2 ? "Reopen" : "Cancel"} to-do
-                        </MenuItem>
-                      </Show>
-                    </Menu>
-                  )}
-                </Popover>
-                <Show when={trashed(item)}>
-                  <Button onClick={() => void patch(item, { tr: false })}>
-                    Restore
-                  </Button>
-                  <Button
-                    class="danger subtle bg-danger/10 text-danger bg-transparent"
+              <div class="editor-footer contents">
+                <ActionBar class="editor-footer-actions">
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    class="text-accent"
+                    aria-label="New to-do"
                     onClick={() =>
-                      ask(
-                        "Permanently delete this item and everything inside it? This cannot be undone.",
-                        async () => {
-                          await mutate(deleteTree(item, all()), true);
-                          if (currentEditor === session) discardEditor();
-                          else releaseEditor(session);
-                        },
-                      )
+                      void run(async () => {
+                        if (await save()) beginCreate("To-Do");
+                      })
                     }
                   >
-                    Delete forever
-                  </Button>
-                </Show>
+                    <Plus size={18} />
+                  </IconButton>
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    aria-label="Schedule to-do"
+                    onClick={() => handleAction("when")}
+                  >
+                    <CalendarDays size={16} />
+                  </IconButton>
+                  <Popover
+                    size="compact"
+                    iconOnly
+                    class="editor-move"
+                    label="Move to"
+                    trigger={<ArrowRight size={16} />}
+                  >
+                    {(close) => (
+                      <>
+                        <div class="destination-list flex max-h-[50dvh] flex-col overflow-auto [&>button]:justify-start [&>button]:p-3 [&>button]:text-muted [&_small]:ml-auto [&_small]:text-quiet">
+                          <Button
+                            onClick={() => {
+                              setDestination("");
+                              setMode("Inbox");
+                              close();
+                            }}
+                          >
+                            <Inbox size={16} />
+                            Inbox
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setDestination("");
+                              if (mode() === "Inbox") setMode("Anytime");
+                              close();
+                            }}
+                          >
+                            <X size={16} />
+                            No Project
+                          </Button>
+                          <For
+                            each={all().filter(
+                              (e) =>
+                                (e.kind.startsWith("Area") ||
+                                  isProject(e) ||
+                                  isHeading(e)) &&
+                                active(e, all()) &&
+                                e.id !== item.id &&
+                                (!isProject(item) || e.kind.startsWith("Area")),
+                            )}
+                          >
+                            {(e) => (
+                              <Button
+                                onClick={() => {
+                                  setDestination(e.id);
+                                  if (mode() === "Inbox") setMode("Anytime");
+                                  close();
+                                }}
+                              >
+                                <Folder size={16} />
+                                {title(e)}
+                              </Button>
+                            )}
+                          </For>
+                        </div>
+                      </>
+                    )}
+                  </Popover>
+
+                  <Popover
+                    size="compact"
+                    iconOnly
+                    class="editor-more"
+                    label="To-do actions"
+                    trigger={<MoreHorizontal size={18} />}
+                  >
+                    {(close) => (
+                      <TaskMenu
+                        close={close}
+                        project={isProject(item)}
+                        inProject={!!refs(item, "pr").length}
+                        action={handleAction}
+                      >
+                        <MenuItem
+                          disabled={saving() || tagBusy() || !name().trim()}
+                          onClick={() => {
+                            close();
+                            void save();
+                          }}
+                        >
+                          Save edits<Kbd>⌘ ↵</Kbd>
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            close();
+                            discardEditor();
+                          }}
+                        >
+                          Discard edits<Kbd>Esc</Kbd>
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            setPreviewNotes((value) => !value);
+                            close();
+                          }}
+                        >
+                          {previewNotes() ? "Edit notes" : "Preview notes"}
+                        </MenuItem>
+                      </TaskMenu>
+                    )}
+                  </Popover>
+                </ActionBar>
+                <div class="absolute right-3.5 flex items-center gap-1">
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    aria-label="Move to trash"
+                    onClick={() => void run(() => remove(item))}
+                  >
+                    <Trash2 size={15} />
+                  </IconButton>
+                  <Show when={trashed(item)}>
+                    <Button onClick={() => void patch(item, { tr: false })}>
+                      Restore
+                    </Button>
+                    <Button
+                      class="danger subtle bg-danger/10 text-danger bg-transparent"
+                      onClick={() =>
+                        ask(
+                          "Permanently delete this item and everything inside it? This cannot be undone.",
+                          async () => {
+                            await mutate(deleteTree(item, all()), true);
+                            if (currentEditor === session) discardEditor();
+                            else releaseEditor(session);
+                          },
+                        )
+                      }
+                    >
+                      Delete forever
+                    </Button>
+                  </Show>
+                </div>
               </div>
             </Portal>
           )}
         </Show>
       </div>
-    );
-  }
-  function SettingsDialog() {
-    const [newTag, setNewTag] = createSignal(""),
-      [shortcut, setShortcut] = createSignal(pref("quickShortcut", ""));
-    async function preference(key: string, value: any) {
-      await run(async () => {
-        const preferences = { ...state().preferences, [key]: value };
-        await call("preferences", { value: preferences });
-        setState((s) => ({ ...s, preferences }));
-      });
-    }
-    async function exportData() {
-      await run(async () => {
-        const data = await call<string>("export_data");
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(
-          new Blob([data], { type: "application/json" }),
-        );
-        a.download = `somedue-${date(today())}.json`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-        toast("Backup exported");
-      });
-    }
-    return (
-      <Dialog
-        title="Settings"
-        close={() => {
-          setSettings(false);
-        }}
-        wide
-      >
-        <div class="settings-layout grid min-h-96 grid-cols-[--spacing(36)_minmax(0,1fr)] gap-6 max-lg:grid-cols-[--spacing(32)_minmax(0,1fr)] max-lg:gap-4 max-sm:grid-cols-1 [&>nav]:sticky [&>nav]:top-0 [&>nav]:flex [&>nav]:flex-col [&>nav]:gap-1 [&>nav]:self-start max-sm:[&>nav]:flex-row max-sm:[&>nav]:flex-wrap [&>nav>button]:justify-start [&>nav>button]:rounded-lg [&>nav>button]:px-3 [&>nav>button]:py-2.5 [&>nav>button]:text-xs [&>nav>button]:text-quiet [&>nav>button.active]:bg-selection [&>nav>button.active]:text-accent">
-          <nav aria-label="Settings categories">
-            <For
-              each={[
-                "General",
-                "Appearance",
-                "Things Cloud",
-                "Tags",
-                "Keyboard",
-                "About",
-              ]}
-            >
-              {(tab) => (
-                <Button
-                  variant="bare"
-                  classList={{ active: settingsTab() === tab }}
-                  onClick={() => setSettingsTab(tab)}
-                >
-                  {tab}
-                </Button>
-              )}
-            </For>
-          </nav>
-          <div class="settings-content min-w-0 px-2 pt-2 pb-4 [&_p]:mb-3.5 [&_p]:text-xs [&_p]:leading-relaxed [&_form+p]:mt-4 [&_h4]:mb-2 [&_h4]:text-sm">
-            <Show when={settingsTab() === "General"}>
-              <SectionHeading>Make space for your day.</SectionHeading>
-              <p class="muted text-muted">
-                A few preferences to make Somedue your own.
-              </p>
-              <Field label="New to-dos go to">
-                <Select
-                  value={pref("defaultList", "Inbox")}
-                  onChange={(e) =>
-                    void preference("defaultList", e.currentTarget.value)
-                  }
-                >
-                  <option>Inbox</option>
-                  <option>Today</option>
-                </Select>
-              </Field>
-              <label class="check-label my-4 flex cursor-pointer items-center gap-2 text-xs leading-relaxed">
-                <Checkbox
-                  type="checkbox"
-                  checked={pref("autoSync", true)}
-                  onChange={(e) =>
-                    void preference("autoSync", e.currentTarget.checked)
-                  }
-                />
-                Sync automatically while the app is open
-              </label>
-              <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
-                <h4>Quick Entry</h4>
-                <p>
-                  Capture a thought from any app. Choose an unused shortcut,
-                  such as Control+Shift+Space.
-                </p>
-                <Field
-                  label="Global shortcut"
-                  hint="Leave empty to turn it off."
-                >
-                  <Input
-                    aria-label="Global shortcut"
-                    placeholder="Control+Shift+Space"
-                    value={shortcut()}
-                    onInput={(e) => setShortcut(e.currentTarget.value)}
-                  />
-                </Field>
-                <Show when={state().shortcutError}>
-                  <p
-                    role="alert"
-                    class="error-text mb-4 text-xs leading-relaxed text-danger"
-                  >
-                    {state().shortcutError}
-                  </p>
-                </Show>
-                <div class="quick-setting-actions mt-3 flex gap-2.5 [&>button]:bg-hover [&>button]:text-xs">
-                  <Button
-                    onClick={() =>
-                      void run(async () => {
-                        await call("configure_shortcut", {
-                          shortcut: shortcut().trim(),
-                        });
-                        setState(await call("load"));
-                        toast("Quick Entry shortcut saved");
-                      })
-                    }
-                  >
-                    Save shortcut
-                  </Button>
-                  <Button onClick={() => void run(() => call("quick_entry"))}>
-                    Open Quick Entry
-                  </Button>
-                </div>
-              </div>
-              <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
-                <h4>Your data</h4>
-                <p>
-                  Local and cloud workspaces stay separate. Offline edits are
-                  saved on this Mac before syncing.
-                </p>
-                <Button onClick={() => void exportData()}>
-                  <Archive size={16} />
-                  Export backup
-                </Button>
-              </div>
-            </Show>
-            <Show when={settingsTab() === "Appearance"}>
-              <SectionHeading>A quieter workspace.</SectionHeading>
-              <Field label="Color theme">
-                <Select
-                  value={pref("theme", "dark")}
-                  onChange={(e) =>
-                    void preference("theme", e.currentTarget.value)
-                  }
-                >
-                  <option value="dark">Dark</option>
-                  <option value="light">Warm light</option>
-                </Select>
-              </Field>
-              <Field label="List density">
-                <Select
-                  value={pref("density", "comfortable")}
-                  onChange={(e) =>
-                    void preference("density", e.currentTarget.value)
-                  }
-                >
-                  <option value="comfortable">Comfortable</option>
-                  <option value="compact">Compact</option>
-                </Select>
-              </Field>
-              <label class="check-label my-4 flex cursor-pointer items-center gap-2 text-xs leading-relaxed">
-                <Checkbox
-                  type="checkbox"
-                  checked={pref("motion", true)}
-                  onChange={(e) =>
-                    void preference("motion", e.currentTarget.checked)
-                  }
-                />
-                Animate transitions
-              </label>
-              <p class="muted text-muted">
-                System Reduce Motion always takes precedence.
-              </p>
-            </Show>
-            <Show when={settingsTab() === "Things Cloud"}>
-              <SectionHeading>Everything, together.</SectionHeading>
-              <p class="muted text-muted">
-                Connect using your Things Cloud account. Your password is stored
-                only in macOS Keychain.
-              </p>
-              <Show
-                when={state().account === "local"}
-                fallback={
-                  <div class="account-card flex flex-col items-start gap-3 py-4 text-xs [&_svg]:text-mint [&>span]:text-xs [&>span]:text-muted [&>button]:text-accent">
-                    <Cloud size={24} />
-                    <strong>{state().account}</strong>
-                    <span>
-                      {state().lastSync
-                        ? `Last sync ${new Date(state().lastSync!).toLocaleString()}`
-                        : "Not yet synced"}
-                    </span>
-                    <span>{state().pending} pending edits</span>
-                    <Button onClick={() => void refresh()} disabled={busy()}>
-                      <RefreshCw size={15} />
-                      Sync now
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        ask(
-                          "Disconnect this account? Its cached tasks and pending edits stay on this Mac. The password will be removed from Keychain.",
-                          async () => {
-                            setState(await call("disconnect"));
-                            toast("Disconnected");
-                          },
-                        )
-                      }
-                    >
-                      Disconnect
-                    </Button>
-                  </div>
-                }
-              >
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    setSettings(false);
-                    setConnectionOpen(true);
-                  }}
-                >
-                  Connect Things Cloud
-                </Button>
-                <p class="small muted connect-hint text-xs text-muted mt-4 max-w-prose">
-                  Signing in opens your cloud workspace. Your local to-dos
-                  remain saved separately.
-                </p>
-              </Show>
-              <Show when={state().blocked}>
-                <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
-                  <h4>Sync recovery</h4>
-                  <p>
-                    A change may conflict with another device or have an
-                    unconfirmed server response. Pending edits are preserved and
-                    will not be resent automatically.
-                  </p>
-                  <Button onClick={() => void exportData()}>
-                    Export drafts first
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      ask(
-                        "Replace pending drafts with the current cloud version? A recovery copy will be retained in your local backup.",
-                        async () => {
-                          setState(
-                            await call("resolve_drafts", { confirm: true }),
-                          );
-                          toast("Cloud version restored");
-                        },
-                      )
-                    }
-                  >
-                    Use cloud version
-                  </Button>
-                </div>
-              </Show>
-            </Show>
-            <Show when={settingsTab() === "Tags"}>
-              <SectionHeading>A place for every context.</SectionHeading>
-              <form
-                class="tag-create mb-2.5 flex items-center gap-2 [&>input]:w-0 [&>input]:flex-1 [&>input]:text-xs"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(async () => {
-                    if (!newTag().trim()) return;
-                    await mutate(
-                      create("Tag4", { tt: newTag().trim(), sh: "", pn: [] }),
-                    );
-                    setNewTag("");
-                  });
-                }}
-              >
-                <Input
-                  aria-label="New tag name"
-                  placeholder="New tag"
-                  value={newTag()}
-                  onInput={(e) => setNewTag(e.currentTarget.value)}
-                />
-                <IconButton type="submit" aria-label="Create tag">
-                  <Plus size={18} />
-                </IconButton>
-              </form>
-              <For each={tags()}>
-                {(t) => (
-                  <div class="tag-setting mb-2.5 flex items-center gap-2 text-muted [&>input]:w-0 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:text-xs">
-                    <Tag size={14} />
-                    <Input
-                      aria-label={`Rename tag ${title(t)}`}
-                      value={title(t)}
-                      onChange={(e) =>
-                        void patch(t, { tt: e.currentTarget.value })
-                      }
-                    />
-                    <IconButton
-                      aria-label={`Delete tag ${title(t)}`}
-                      onClick={() =>
-                        ask(
-                          `Delete the tag “${title(t)}” from all items?`,
-                          async () => {
-                            const changes: Changes = {
-                              [t.id]: { e: t.kind, t: 2, p: {} },
-                            };
-                            for (const e of all().filter((x) =>
-                              refs(x, "tg").includes(t.id),
-                            ))
-                              Object.assign(
-                                changes,
-                                event(e, {
-                                  tg: refs(e, "tg").filter((id) => id !== t.id),
-                                }),
-                              );
-                            await mutate(changes, true);
-                          },
-                        )
-                      }
-                    >
-                      <X size={14} />
-                    </IconButton>
-                  </div>
-                )}
-              </For>
-            </Show>
-            <Show when={settingsTab() === "Keyboard"}>
-              <SectionHeading>Keep your hands on the keys.</SectionHeading>
-              <div class="shortcuts [&>div]:flex [&>div]:items-center [&>div]:justify-between [&>div]:py-2 [&>div]:text-xs [&>div]:text-muted">
-                <For
-                  each={[
-                    ["New to-do", "⌘ N"],
-                    ["New project", "⌥ ⌘ N"],
-                    ["New heading", "⇧ ⌘ N"],
-                    ["Navigate lists", "⌘ 1 … 7"],
-                    ["Search", "⌘ F"],
-                    ["Open selection", "↵"],
-                    ["Save & close", "⌘ ↵"],
-                    ["Complete / reopen", "⌘ K"],
-                    ["Cancel item", "⌥ ⌘ K"],
-                    ["Move to…", "⇧ ⌘ M"],
-                    ["Reorder", "⌘ ↑ / ↓"],
-                    ["Today / This Evening", "⌘ T / ⌘ E"],
-                    ["Anytime / Someday", "⌘ R / ⌘ O"],
-                    ["Duplicate", "⌘ D"],
-                    ["Undo last edit", "⌘ Z"],
-                    ["Trash selected item", "⌫"],
-                    ["Settings", "⌘ ,"],
-                  ]}
-                >
-                  {(row) => (
-                    <div>
-                      <span>{row[0]}</span>
-                      <Kbd>{row[1]}</Kbd>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </Show>
-            <Show when={settingsTab() === "About"}>
-              <img
-                class="about-mark my-2.5 mb-5 grid size-16 place-items-center object-contain"
-                src={appIcon}
-                alt="Somedue app icon"
-              />
-              <SectionHeading>Somedue</SectionHeading>
-              <p>A considered home for what comes next.</p>
-              <p class="muted text-muted">
-                Version 0.1.0
-                <br />
-                An independent Things Cloud client.
-                <br />
-                Not affiliated with Cultured Code.
-              </p>
-              <p class="small muted text-xs text-muted">
-                Local certificate signing. Not notarized.
-                <br />
-                Cloud protocol is unofficial. See the repository’s verification
-                record for tested behavior and limitations.
-              </p>
-            </Show>
-          </div>
-        </div>
-      </Dialog>
     );
   }
 }

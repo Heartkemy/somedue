@@ -19,9 +19,7 @@ test("pointer focus stays quiet; keyboard focus, scroll indicators and sidebar c
     await expect(row).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     expect(
       await row.evaluate(
-        (el) =>
-          parseFloat(getComputedStyle(el).borderRadius) >=
-          el.getBoundingClientRect().height / 2,
+        (el) => parseFloat(getComputedStyle(el).borderRadius) === 8,
       ),
     ).toBe(true);
     await expect(row.locator("svg")).toHaveCount(1);

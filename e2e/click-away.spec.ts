@@ -49,7 +49,7 @@ test("click-away saves the first editor and opens the clicked row; failure prese
   );
 });
 
-test("editor controls occupy the footer and notifications reserve their own space", async ({
+test("editor controls occupy the footer and routine saves remain silent", async ({
   page,
 }) => {
   await page.locator("#item-a .task-title").click();
@@ -59,15 +59,9 @@ test("editor controls occupy the footer and notifications reserve their own spac
   ).toBeVisible();
   await page.getByRole("textbox", { name: "To-do title" }).fill("Saved draft");
   await page.locator("h1").click();
-  await expect(page.locator(".toast")).toContainText("Saved");
-  const boxes = await page.evaluate(() =>
-    [".list-page", ".toast", ".list-footer"].map((selector) => {
-      const r = document.querySelector(selector)!.getBoundingClientRect();
-      return { top: r.top, bottom: r.bottom };
-    }),
-  );
-  expect(boxes[0].bottom).toBeLessThanOrEqual(boxes[1].top);
-  expect(boxes[1].bottom).toBeLessThanOrEqual(boxes[2].top);
+  await expect(page.locator(".task-editor")).toHaveCount(0);
+  await expect(page.locator(".toast")).toHaveCount(0);
+  await expect(page.locator("#item-a .task-title")).toHaveText("Saved draft");
   const backgrounds = await page.evaluate(() =>
     [".app", ".titlebar", "main"].map((selector) => {
       const s = getComputedStyle(document.querySelector(selector)!);

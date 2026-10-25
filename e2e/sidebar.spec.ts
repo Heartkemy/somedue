@@ -71,9 +71,9 @@ for (const width of [1120, 760])
     });
     expect(shell).toEqual({
       top: 0,
-      edge: 8,
-      centerY: 16,
-      toolsCenterY: 16,
+      edge: 16,
+      centerY: 28,
+      toolsCenterY: 28,
       font: "14px",
     });
     const geometry = await page.locator(".sidebar-item").evaluateAll((els) =>

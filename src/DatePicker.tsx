@@ -194,6 +194,11 @@ export default function DatePicker(props: {
         : "Deadline";
   return (
     <Popover
+      triggerClass={
+        props.iconOnly
+          ? "bg-transparent hover:bg-transparent text-quiet hover:text-ink"
+          : undefined
+      }
       size={props.compact ? "compact" : "small"}
       iconOnly={props.iconOnly}
       label={label()}

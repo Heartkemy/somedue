@@ -39,7 +39,7 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
     expect(box.height).toBe(28);
   }
   await trigger.click();
-  const menu = page.locator(".control-popover:popover-open .ui-menu");
+  const menu = page.locator(".control-popover:popover-open .ui-menu:visible");
   await expect(menu).toHaveAttribute("role", "menu");
   await expect(menu.getByRole("menuitem")).toHaveCount(2);
   await expect(menu.getByRole("menuitem").last()).toHaveCSS(
@@ -67,6 +67,6 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
     .getByRole("button", { name: "To-do actions", exact: true })
     .click();
   await expect(
-    page.locator(".control-popover:popover-open .ui-menu"),
+    page.locator(".control-popover:popover-open .ui-menu:visible"),
   ).toBeVisible();
 });
