@@ -1,3 +1,4 @@
+import { Input } from "./ui";
 import { createSignal, createMemo, createEffect, For, Show } from "solid-js";
 import {
   CalendarDays,
@@ -42,7 +43,7 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
     );
   return (
     <div class="calendar">
-      <div class="calendar-header">
+      <div class="calendar-header mb-2 flex items-center justify-between gap-1.5 text-xs">
         <IconButton
           size="small"
           aria-label="Previous month"
@@ -59,17 +60,24 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
           <ChevronRight size={16} />
         </IconButton>
       </div>
-      <div class="calendar-weekdays" aria-hidden="true">
+      <div
+        class="calendar-weekdays mb-1.5 grid grid-cols-7 gap-0.5 text-center text-xs text-quiet"
+        aria-hidden="true"
+      >
         <For each={["M", "T", "W", "T", "F", "S", "S"]}>
           {(d) => <span>{d}</span>}
         </For>
       </div>
-      <div class="calendar-days" role="group" aria-label={monthLabel()}>
+      <div
+        class="calendar-days grid grid-cols-7 gap-0.5"
+        role="group"
+        aria-label={monthLabel()}
+      >
         <For each={days()}>
           {(d) => (
             <Button
               variant="bare"
-              class="calendar-day"
+              class="calendar-day min-h-8 min-w-0 w-full rounded-full p-0 text-xs [&.outside]:text-quiet [&.today]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1"
               data-date={iso(d)}
               aria-label={d.toLocaleDateString("en", {
                 weekday: "long",
@@ -117,6 +125,7 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
 export default function DatePicker(props: {
   kind: "when" | "deadline";
   compact?: boolean;
+  iconOnly?: boolean;
   value: string;
   mode?: string;
   change: (value: string, mode?: string) => void;
@@ -186,6 +195,7 @@ export default function DatePicker(props: {
   return (
     <Popover
       size={props.compact ? "compact" : "small"}
+      iconOnly={props.iconOnly}
       label={label()}
       class="date-picker"
       trigger={
@@ -201,7 +211,12 @@ export default function DatePicker(props: {
               <CalendarDays size={14} />
             )}
           </Show>
-          <Show when={!props.compact || props.kind === "when" || props.value}>
+          <Show
+            when={
+              !props.iconOnly &&
+              (!props.compact || props.kind === "when" || props.value)
+            }
+          >
             {text()}
           </Show>
         </>
@@ -210,7 +225,7 @@ export default function DatePicker(props: {
       {(close) => (
         <>
           <form
-            class="date-query"
+            class="date-query [&>input]:min-h-8 [&>input]:px-2 [&>input]:py-1 [&>input]:text-xs"
             onSubmit={(e) => {
               e.preventDefault();
               const parsed = parse();
@@ -224,7 +239,7 @@ export default function DatePicker(props: {
               close();
             }}
           >
-            <input
+            <Input
               autofocus
               aria-label={`${label()} date`}
               placeholder={label()}
@@ -236,12 +251,15 @@ export default function DatePicker(props: {
             />
           </form>
           <Show when={error()}>
-            <p role="alert" class="error-text">
+            <p
+              role="alert"
+              class="error-text mb-4 text-xs leading-relaxed text-danger"
+            >
               {error()}
             </p>
           </Show>
           <Show when={props.kind === "when"}>
-            <div class="date-shortcuts">
+            <div class="date-shortcuts grid grid-cols-1 gap-1.5 [&>button]:min-h-7 [&>button]:justify-start [&>button]:bg-transparent [&>button]:text-xs [&>button[aria-pressed=true]]:bg-selection [&>button[aria-pressed=true]]:text-accent">
               <For each={["Today", "This Evening"]}>
                 {(mode) => (
                   <Button
@@ -267,7 +285,7 @@ export default function DatePicker(props: {
             }}
           />
           <Show when={props.kind === "when"}>
-            <div class="date-shortcuts date-secondary">
+            <div class="date-shortcuts date-secondary grid grid-cols-1 gap-1.5 [&>button]:min-h-7 [&>button]:justify-start [&>button]:bg-transparent [&>button]:text-xs [&>button[aria-pressed=true]]:bg-selection [&>button[aria-pressed=true]]:text-accent border-t border-hover pt-1.5">
               <For each={["Anytime", "Someday"]}>
                 {(mode) => (
                   <Button
@@ -286,7 +304,7 @@ export default function DatePicker(props: {
             </div>
             <Button
               size="small"
-              class="reminder-toggle"
+              class="reminder-toggle justify-start text-muted"
               aria-expanded={reminderOpen()}
               onClick={() => setReminderOpen((open) => !open)}
             >
@@ -300,9 +318,9 @@ export default function DatePicker(props: {
                   <p>Reminder saving is not available in this editor yet.</p>
                 }
               >
-                <label class="reminder-field">
+                <label class="reminder-field grid gap-1.5 text-xs text-muted">
                   Remind me
-                  <input
+                  <Input
                     type="datetime-local"
                     aria-label="Reminder date and time"
                     value={props.reminder || ""}
