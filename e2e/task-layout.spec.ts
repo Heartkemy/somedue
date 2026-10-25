@@ -65,21 +65,15 @@ for (const width of [1120, 760])
       ).toBe(x);
       const alignment = await page.locator("#item-a").evaluate((el) => ({
         title: el.querySelector(".task-title")!.getBoundingClientRect().x,
-        check: el.querySelector(".task-check")!.getBoundingClientRect().x + 8,
+        check: el.querySelector(".task-check")!.getBoundingClientRect().x,
       }));
-      expect(alignment.title).toBe(
-        await page.locator("h1").evaluate((el) => el.getBoundingClientRect().x),
-      );
+      expect(alignment.title - alignment.check).toBe(28);
       expect(
         Math.abs(
           alignment.check -
             (await page
               .locator(".page-symbol")
-              .evaluate(
-                (el) =>
-                  el.getBoundingClientRect().x +
-                  el.getBoundingClientRect().width / 2,
-              )),
+              .evaluate((el) => el.getBoundingClientRect().x)),
         ),
       ).toBeLessThan(1);
       await expect(

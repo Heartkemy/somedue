@@ -110,6 +110,7 @@ offer a `plain` variant for writing surfaces. Their `class` props use
 `tailwind-merge`, so caller utilities can override defaults without CSS overrides.
 Use `Button align="content"` to align its contents while preserving hover padding.
 `NavigationItem` and `ListHeading` share navigation geometry and list hierarchy.
+`UnderlineTab` follows Samlad's serif tabs and growing active underline.
 Use `Field`, `Dialog`, `Select`, `Menu`, `Checkbox`, `Kbd`, and `SectionHeading`
 for the corresponding shared UI patterns.
 

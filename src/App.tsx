@@ -68,6 +68,7 @@ import {
   Field,
   ListHeading,
   NavigationItem,
+  UnderlineTab,
   FeedbackContext,
   Menu,
   MenuItem,
@@ -1847,7 +1848,7 @@ export default function App() {
             >
               <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
                 <div class="heading-line flex items-baseline gap-3">
-                  <span class="page-symbol flex h-8 w-4 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-8 [&>svg]:shrink-0 [&>svg]:stroke-1 [&>.project-ring]:size-8">
+                  <span class="page-symbol flex size-8 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-8 [&>svg]:shrink-0 [&>svg]:stroke-1 [&>.project-ring]:size-8">
                     {list() === "Inbox" ? (
                       <Inbox />
                     ) : list() === "Today" ? (
@@ -1969,29 +1970,22 @@ export default function App() {
               </Show>
               <Show when={list() === "Upcoming"}>
                 <div
-                  class="upcoming-switch mb-5 flex gap-1"
+                  class="upcoming-switch mb-5 flex items-baseline gap-5"
                   role="group"
                   aria-label="Upcoming view"
                 >
-                  <Button
-                    size="small"
-                    variant="quiet"
-                    align="content"
+                  <UnderlineTab
                     aria-pressed={upcomingCalendar()}
-                    classList={{ "bg-selection": upcomingCalendar() }}
                     onClick={() => setUpcomingCalendar(true)}
                   >
                     Calendar
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="quiet"
+                  </UnderlineTab>
+                  <UnderlineTab
                     aria-pressed={!upcomingCalendar()}
-                    classList={{ "bg-selection": !upcomingCalendar() }}
                     onClick={() => setUpcomingCalendar(false)}
                   >
                     Scheduled only
-                  </Button>
+                  </UnderlineTab>
                 </div>
               </Show>
               <Show when={list() === "Trash" && items().length}>
@@ -3713,9 +3707,10 @@ export default function App() {
         saveEditor = undefined;
       }
     });
+    // Matching margin and padding extend the surface without moving its content.
     return (
       <div
-        class="task-editor relative -mx-3 mb-4 flex flex-col gap-2 rounded-xl bg-surface px-3 py-5 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
+        class="task-editor relative -ml-6.5 -mr-3 mb-4 flex flex-col gap-2 rounded-xl bg-surface pl-6.5 pr-3 py-5 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
         data-instant={instant || undefined}
         ref={editor}
         role="group"
@@ -3947,8 +3942,6 @@ export default function App() {
           </For>
           <Button
             size="small"
-            variant="quiet"
-            align="content"
             class="add-check justify-start self-start gap-2.5 py-1.5 [&>svg]:w-4.5"
             onClick={() => addCheck()}
           >

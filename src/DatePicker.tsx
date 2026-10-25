@@ -209,9 +209,8 @@ export default function DatePicker(props: {
       class="schedule-chip flex min-w-0 items-center rounded-md transition-colors"
       classList={{
         "bg-hover hover:bg-ink/10": hasSurface(),
+        // Filled controls align their surface; a bare icon aligns its glyph.
         "-ml-1.5": props.align === "content" && !!iconOnly(),
-        "-ml-2": props.align === "content" && !iconOnly() && !!props.compact,
-        "-ml-3": props.align === "content" && !iconOnly() && !props.compact,
       }}
     >
       <Popover

@@ -88,7 +88,10 @@ test("schedule glyph and list controls align with their text gutter", async ({
   await picker
     .getByRole("button", { name: "This Evening", exact: true })
     .click();
-  expect((await when.locator("svg").boundingBox())!.x).toBe(notesX);
+  expect(
+    (await page.locator(".task-editor .schedule-chip").first().boundingBox())!
+      .x,
+  ).toBe(notesX);
   await page.screenshot({
     path: info.outputPath("aligned-schedule.png"),
     animations: "disabled",

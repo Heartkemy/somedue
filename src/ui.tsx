@@ -10,3 +10,4 @@ export { FeedbackContext } from "./ui/Feedback";
 export { Input, Textarea } from "./ui/Input";
 export { Kbd, SectionHeading, ListHeading } from "./ui/Typography";
 export { NavigationItem } from "./ui/NavigationItem";
+export { UnderlineTab } from "./ui/UnderlineTab";

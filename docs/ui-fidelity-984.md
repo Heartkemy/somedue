@@ -21,6 +21,8 @@ Task #984 verified immediate click-away editor switching while persistence remai
 
 The task #1000 follow-up passes 162 Chromium/WebKit UI cases and 37 model, motion and editor-save tests. A final 14-case run covers selected-row Enter handling and transparent Settings hover. Browser captures cover the revised controls in desktop dark and narrow light layouts; these results do not claim native-window or live Cloud verification. App icon generation is handled separately by task #1002.
 
+Later task #1000 corrections measure visible icon bounds and control surfaces directly. Header icons occupy their full 32px column with a 12px text gap; project-heading dividers span the action-menu column. Assigned schedule chips and the checklist-add button align their background edges with the notes. The editor's matched negative margin and left padding extend only its surface, keeping content in place. Upcoming uses the shared Samlad-style serif underline tabs, including 1.6× underline growth on hover.
+
 The visual verdict is structural agreement with the references and the latest explicit corrections. Samlad colors/fonts/surface treatment intentionally differ from the original Things screenshots. The checks do not claim identical pixels or complete product parity.
 
 Reproduce with the commands in README.md. Browser screenshots are generated under ignored test-results/; native screenshots and exact local receipts are under ignored out/ui-984/.

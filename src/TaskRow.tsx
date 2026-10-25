@@ -154,7 +154,7 @@ export default function TaskRow(props: {
             : "Date unavailable"}
         </span>
       </Show>
-      <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1 group-[.heading]/task:border-b group-[.heading]/task:border-hover group-[.heading]/task:pb-3">
+      <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1">
         <div class="task-summary flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Show when={props.isNew && !isHeading(props.item)}>
             <span
@@ -178,6 +178,10 @@ export default function TaskRow(props: {
         </Show>
       </div>
       <Show when={isHeading(props.item)}>
+        <div
+          class="heading-divider pointer-events-none absolute inset-x-3 bottom-0 border-t border-hover"
+          aria-hidden="true"
+        />
         <IconButton
           size="compact"
           variant="quiet"
