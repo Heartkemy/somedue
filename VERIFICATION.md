@@ -131,3 +131,17 @@ remains the earlier build. Opaque `rp` repeaters, advanced imported rule variant
 and automatic copying of repeating projects still require Things; the app
 preserves them and rejects unsupported rule changes. Simple rule support and
 synthetic UI/native tests do not establish live cross-device interoperability.
+
+### Installation follow-up
+
+At the user's request, `bun run install:macos` now builds the current working
+files, verifies and installs the signed app, quits the previous instance normally,
+and opens the updated app. It was executed successfully with uncommitted command
+and documentation changes. Save open edits before running it.
+
+The installed executable matches `out/build-receipt.json`. Strict bundle/helper
+signatures and all five synthetic installed Keychain checks passed. The updated
+app was reopened and its native window shows the new sidebar handle and task UI.
+The Keychain tests used no real credentials or task database. Normal app launch
+opened the user's existing workspace; no task edits were made during inspection.
+The installed build is locally certificate-signed and is not notarized.

@@ -76,12 +76,16 @@ fingerprint, then package and install:
 ```sh
 export SOMEDUE_CODESIGN_IDENTITY="YOUR_40_CHARACTER_CERTIFICATE_FINGERPRINT"
 bun run install:macos
-open -a /Applications/Somedue.app
 ```
 
 The packaging script generates icons, builds the app, stages its signed Keychain
 helper, verifies signatures, and installs `/Applications/Somedue.app`. It backs up
-an existing Somedue installation before replacing it. Without a configured
+an existing Somedue installation before replacing it, then quits the old instance
+normally and opens the updated app. Save any open edits before running it.
+
+Once signing is configured, `bun run install:macos` is the one-shot update command.
+It builds the current working files, including uncommitted changes; no commit or
+branch switch is required. Without a configured
 certificate, it produces an ad-hoc local build that cannot save Cloud credentials.
 
 You can also store the fingerprint in

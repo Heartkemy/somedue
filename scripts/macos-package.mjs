@@ -11,6 +11,7 @@ const flags = new Set(process.argv.slice(2));
 const cargoTarget = process.env.CARGO_TARGET_DIR || path.join(homedir(), 'Library/Caches/Somedue/cargo-target');
 if ([...flags].some(flag => !['--install', '--skip-build'].includes(flag))) throw new Error('Usage: bun scripts/macos-package.mjs [--install] [--skip-build]');
 if (process.platform !== 'darwin') throw new Error('Packaging requires macOS.');
+if (flags.has('--install')) console.log('Building current working files, including uncommitted changes. Somedue will restart after installation; save open edits first.');
 // Follow the reference: explicit override, persistent identity file, then honest local ad-hoc.
 const identityFile = path.join(homedir(), 'Library/Application Support/Somedue/macos-signing-identity');
 const identity = (process.env.SOMEDUE_CODESIGN_IDENTITY ?? (existsSync(identityFile) ? readFileSync(identityFile, 'utf8').trim() : '-')).toUpperCase();
@@ -62,8 +63,23 @@ if (flags.has('--install')) {
     receipt.backup = backup;
   } else renameSync(stage, destination);
   run('codesign', ['--verify', '--deep', '--strict', destination]);
+  if (digest(path.join(destination, 'Contents/MacOS', executableName)) !== receipt.executableSha256) throw new Error('Installed executable does not match the build.');
   receipt.installedPath = destination;
 }
 mkdirSync(path.join(root, 'out'), { recursive: true });
 writeFileSync(path.join(root, 'out/build-receipt.json'), JSON.stringify(receipt, null, 2));
 console.log(JSON.stringify(receipt, null, 2));
+if (flags.has('--install')) {
+  // Ask the existing instance to quit normally; never force-kill it or bypass a cancelled quit.
+  run('osascript', ['-e', `
+if application id "${bundleId}" is running then
+  tell application id "${bundleId}" to quit
+  repeat 100 times
+    if not (application id "${bundleId}" is running) then exit repeat
+    delay 0.1
+  end repeat
+  if application id "${bundleId}" is running then error "Somedue did not quit. Save your edits and quit it, then run the command again."
+end if`], { timeout: 15000 });
+  run('open', ['-a', receipt.installedPath]);
+  console.log(`Installed and opened ${receipt.installedPath}`);
+}
