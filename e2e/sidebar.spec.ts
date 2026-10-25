@@ -49,20 +49,20 @@ for (const width of [1120, 760])
       seed,
     );
     await page.getByRole("button", { name: "Sync now", exact: true }).click();
-    await expect(page.locator(".sidebar-item")).toHaveCount(24);
+    await expect(page.locator(".sidebar-body .sidebar-item")).toHaveCount(24);
     const shell = await page.evaluate(() => {
       const sidebar = document
           .querySelector(".sidebar")!
           .getBoundingClientRect(),
         toggle = document
-          .querySelector('[aria-label="Hide sidebar"]')!
+          .querySelector(".sidebar-resize-handle")!
           .getBoundingClientRect();
       const tools = document
         .querySelector(".top-tools")!
         .getBoundingClientRect();
       return {
         top: sidebar.top,
-        edge: sidebar.right - toggle.right,
+        gap: toggle.left - sidebar.right,
         centerY: toggle.y + toggle.height / 2,
         toolsCenterY: tools.y + tools.height / 2,
         font: getComputedStyle(document.querySelector(".sidebar-item")!)
@@ -71,32 +71,34 @@ for (const width of [1120, 760])
     });
     expect(shell).toEqual({
       top: 0,
-      edge: 8,
-      centerY: 16,
-      toolsCenterY: 16,
-      font: "14px",
+      gap: 4,
+      centerY: (width === 760 ? 540 : 780) / 2,
+      toolsCenterY: 28,
+      font: "16px",
     });
-    const geometry = await page.locator(".sidebar-item").evaluateAll((els) =>
-      els.map((el) => {
-        const row = el.getBoundingClientRect(),
-          icon = el.querySelector("svg")!.getBoundingClientRect(),
-          text = el.querySelector(".sidebar-label")!.getBoundingClientRect();
-        return {
-          iconX: icon.x,
-          textX: text.x,
-          height: row.height,
-          width: row.width,
-          centerError: Math.abs(
-            icon.y + icon.height / 2 - (text.y + text.height / 2),
-          ),
-        };
-      }),
-    );
+    const geometry = await page
+      .locator(".sidebar-body .sidebar-item")
+      .evaluateAll((els) =>
+        els.map((el) => {
+          const row = el.getBoundingClientRect(),
+            icon = el.querySelector("svg")!.getBoundingClientRect(),
+            text = el.querySelector(".sidebar-label")!.getBoundingClientRect();
+          return {
+            iconX: icon.x,
+            textX: text.x,
+            height: row.height,
+            width: row.width,
+            centerError: Math.abs(
+              icon.y + icon.height / 2 - (text.y + text.height / 2),
+            ),
+          };
+        }),
+      );
     expect(new Set(geometry.map((x) => x.iconX)).size).toBe(1);
     expect(new Set(geometry.map((x) => x.textX)).size).toBe(1);
     expect(new Set(geometry.map((x) => x.width)).size).toBe(1);
     for (const row of geometry) {
-      expect(row.height).toBe(28);
+      expect(row.height).toBe(32);
       expect(row.centerError).toBeLessThan(0.5);
     }
     const sidebarFooter = await page.locator(".sidebar-bottom").boundingBox(),
@@ -121,8 +123,8 @@ for (const width of [1120, 760])
     await expect(toggle).toHaveCSS("opacity", "1");
     const caretBox = (await toggle.boundingBox())!,
       areaBox = (await page.locator(".area-link").first().boundingBox())!;
-    expect(caretBox.width).toBe(28);
-    expect(caretBox.x).toBeGreaterThan(areaBox.x + areaBox.width - 40);
+    expect(caretBox.width).toBe(32);
+    expect(caretBox.x + caretBox.width).toBe(areaBox.x + areaBox.width - 8);
     const before = (await page
       .locator(".area-link .sidebar-label")
       .first()

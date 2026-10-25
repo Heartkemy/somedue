@@ -13,6 +13,7 @@
   --color-accent: #ffc200;
   --color-mint: #00ffd0;
   --color-orchid: #d400ff;
+  --color-project: #dc00ff;
   --color-hover: #ffffff0b;
   --color-field: #1f1a15;
   --color-selection: #ffc20015;
@@ -43,6 +44,7 @@
     --color-accent: #966900;
     --color-mint: #00715d;
     --color-orchid: #8c22b5;
+    --color-project: #dc00ff;
     --color-hover: #30251c09;
     --color-field: #e9e1d5;
     --color-selection: #ffc20028;
@@ -66,11 +68,15 @@
   }
 
   /* Focus policy also covers native/third-party focus targets without a component class. */
-  :is(button, input, textarea, select, summary, [tabindex]):focus-visible {
+  :is(button, input, textarea, select, summary, [tabindex]):not(
+      [popover]
+    ):focus-visible {
     @apply outline-none ring-2 ring-mint ring-offset-2 ring-offset-bg;
   }
   html[data-input-modality="pointer"]
-    :is(button, input, textarea, select, summary, [tabindex]):focus {
+    :is(button, input, textarea, select, summary, [tabindex]):not(
+      [popover]
+    ):focus {
     @apply outline-none! [box-shadow:none]!;
   }
 

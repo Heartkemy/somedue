@@ -1,7 +1,7 @@
 import { Input } from "./ui";
 import { createSignal, createMemo, For, Show } from "solid-js";
 import { Tag, Plus, X } from "lucide-solid";
-import { Button, Checkbox, IconButton } from "./ui";
+import { Button, Checkbox, IconButton, Pill } from "./ui";
 import { Popover } from "./Popover";
 import { title, type Entity } from "./model";
 export default function TagPicker(props: {
@@ -54,10 +54,11 @@ export default function TagPicker(props: {
         size={props.compact ? "compact" : "small"}
         label={props.label || "Tags"}
         class="tag-dropdown"
+        iconOnly={props.compact}
         width={248}
         trigger={
           <>
-            <Tag size={14} />
+            <Tag size={16} />
             <Show when={!props.compact}>Tags</Show>
           </>
         }
@@ -109,7 +110,7 @@ export default function TagPicker(props: {
                       checked={props.selected.includes(tag.id)}
                       onChange={() => toggle(tag.id)}
                     />
-                    <span>{title(tag)}</span>
+                    <Pill>{title(tag)}</Pill>
                   </label>
                 )}
               </For>
@@ -134,15 +135,14 @@ export default function TagPicker(props: {
       </Popover>
       <For each={props.tags.filter((t) => props.selected.includes(t.id))}>
         {(tag) => (
-          <Button
-            size={props.compact ? "compact" : "small"}
-            class="assigned-tag text-accent"
+          <Pill
+            class="assigned-tag"
             aria-label={`Remove tag ${title(tag)}`}
             onClick={() => toggle(tag.id)}
           >
             {title(tag)}
             <X size={12} />
-          </Button>
+          </Pill>
         )}
       </For>
     </div>

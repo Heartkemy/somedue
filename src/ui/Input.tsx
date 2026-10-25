@@ -1,4 +1,4 @@
-import { splitProps, type JSX } from "solid-js";
+import { createEffect, onMount, splitProps, type JSX } from "solid-js";
 import { twMerge } from "tailwind-merge";
 
 const inputClasses =
@@ -16,7 +16,7 @@ export function Input(
         inputClasses,
         "min-h-10",
         local.variant === "plain" &&
-          "bg-transparent hover:bg-transparent focus-visible:bg-field focus-visible:[box-shadow:none]",
+          "bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:[box-shadow:none]",
         local.class,
       )}
     />
@@ -24,17 +24,46 @@ export function Input(
 }
 
 export function Textarea(
-  props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement> & InputStyle,
+  props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement> &
+    InputStyle & { autosize?: boolean },
 ) {
-  const [local, rest] = splitProps(props, ["class", "variant"]);
+  const [local, rest] = splitProps(props, [
+    "class",
+    "variant",
+    "autosize",
+    "onInput",
+    "ref",
+  ]);
+  let element!: HTMLTextAreaElement;
+  const resize = () => {
+    if (!local.autosize || !element?.isConnected) return;
+    // Notes grow to their measured content instead of exposing a native resize grip.
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
+  };
+  onMount(resize);
+  createEffect(() => {
+    void props.value;
+    queueMicrotask(resize);
+  });
   return (
     <textarea
       {...rest}
+      ref={(el) => {
+        element = el;
+        if (typeof local.ref === "function") local.ref(el);
+      }}
+      onInput={(event) => {
+        const handler = local.onInput;
+        if (typeof handler === "function") handler(event);
+        else if (Array.isArray(handler)) handler[0](handler[1], event);
+        resize();
+      }}
       class={twMerge(
         inputClasses,
-        "resize-y",
+        local.autosize ? "resize-none" : "resize-y",
         local.variant === "plain" &&
-          "bg-transparent hover:bg-transparent focus-visible:bg-field focus-visible:[box-shadow:none]",
+          "bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:[box-shadow:none]",
         local.class,
       )}
     />

@@ -1,9 +1,13 @@
 export { Button, IconButton, type ButtonProps } from "./ui/Button";
-export { Checkbox } from "./ui/Checkbox";
+export { Checkbox, CheckButton } from "./ui/Checkbox";
+export { Pill } from "./ui/Pill";
+export { ActionBar } from "./ui/ActionBar";
 export { Field } from "./ui/Field";
 export { Dialog } from "./ui/Dialog";
 export { Select } from "./ui/Select";
-export { Menu, MenuItem } from "./ui/Menu";
+export { Menu, MenuItem, MenuDivider, MenuPopup, MenuSubmenu } from "./ui/Menu";
 export { FeedbackContext } from "./ui/Feedback";
 export { Input, Textarea } from "./ui/Input";
-export { Kbd, SectionHeading } from "./ui/Typography";
+export { Kbd, SectionHeading, ListHeading } from "./ui/Typography";
+export { NavigationItem } from "./ui/NavigationItem";
+export { UnderlineTab } from "./ui/UnderlineTab";

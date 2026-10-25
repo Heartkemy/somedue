@@ -8,13 +8,17 @@ import "./style.css";
 import App from "./App";
 import QuickEntry from "./QuickEntry";
 import { installInteractionState } from "./interactions";
+import RecoveryBoundary from "./RecoveryBoundary";
 installInteractionState();
 render(
-  () =>
-    new URLSearchParams(location.search).has("quick") ? (
-      <QuickEntry />
-    ) : (
-      <App />
-    ),
+  () => (
+    <RecoveryBoundary>
+      {new URLSearchParams(location.search).has("quick") ? (
+        <QuickEntry />
+      ) : (
+        <App />
+      )}
+    </RecoveryBoundary>
+  ),
   document.getElementById("root")!,
 );

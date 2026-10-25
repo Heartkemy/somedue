@@ -5,14 +5,14 @@ import {
   Flag,
   ChevronLeft,
   ChevronRight,
-  Star,
-  Moon,
-  Archive,
   Bell,
+  CalendarX,
+  X,
 } from "lucide-solid";
 import { Button, IconButton } from "./ui";
 import { Popover } from "./Popover";
 import { date, today } from "./model";
+import { ListIcon } from "./TaskIndicators";
 function Calendar(props: { value: string; choose: (value: string) => void }) {
   const [month, setMonth] = createSignal(
     new Date(`${props.value || date(today())}T00:00:00Z`),
@@ -77,7 +77,7 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
           {(d) => (
             <Button
               variant="bare"
-              class="calendar-day min-h-8 min-w-0 w-full rounded-full p-0 text-xs [&.outside]:text-quiet [&.today]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1"
+              class="calendar-day min-h-7 min-w-0 w-full rounded-full p-0 text-xs [&.outside:not(.chosen)]:text-quiet [&.today:not(.chosen)]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1"
               data-date={iso(d)}
               aria-label={d.toLocaleDateString("en", {
                 weekday: "long",
@@ -131,6 +131,8 @@ export default function DatePicker(props: {
   change: (value: string, mode?: string) => void;
   reminder?: string;
   changeReminder?: (value: string) => void;
+  clearable?: boolean;
+  align?: "content";
 }) {
   const [query, setQuery] = createSignal("");
   const [error, setError] = createSignal("");
@@ -192,126 +194,177 @@ export default function DatePicker(props: {
             timeZone: "UTC",
           })
         : "Deadline";
+  const hasSurface = () =>
+    !!props.clearable &&
+    (props.kind === "deadline"
+      ? !!props.value
+      : !!props.mode && props.mode !== "Inbox");
+  const iconOnly = () =>
+    props.iconOnly ||
+    (props.clearable &&
+      props.kind === "when" &&
+      (!props.mode || props.mode === "Inbox"));
   return (
-    <Popover
-      size={props.compact ? "compact" : "small"}
-      iconOnly={props.iconOnly}
-      label={label()}
-      class="date-picker"
-      trigger={
-        <>
-          <Show when={props.kind === "when"} fallback={<Flag size={14} />}>
-            {props.mode === "Today" ? (
-              <Star size={14} />
-            ) : props.mode === "This Evening" ? (
-              <Moon size={14} />
-            ) : props.mode === "Someday" ? (
-              <Archive size={14} />
-            ) : (
-              <CalendarDays size={14} />
-            )}
-          </Show>
-          <Show
-            when={
-              !props.iconOnly &&
-              (!props.compact || props.kind === "when" || props.value)
-            }
-          >
-            {text()}
-          </Show>
-        </>
-      }
+    <div
+      class="schedule-chip flex min-w-0 items-center rounded-md transition-colors"
+      classList={{
+        "bg-hover hover:bg-ink/10": hasSurface(),
+        // Filled controls align their surface; a bare icon aligns its glyph.
+        "-ml-1.5": props.align === "content" && !!iconOnly(),
+      }}
     >
-      {(close) => (
-        <>
-          <form
-            class="date-query [&>input]:min-h-8 [&>input]:px-2 [&>input]:py-1 [&>input]:text-xs"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const parsed = parse();
-              if (!parsed || (props.kind === "deadline" && !parsed.value)) {
-                setError("Use today, tomorrow, a weekday, or YYYY-MM-DD.");
-                return;
+      <Popover
+        width={400}
+        triggerClass={
+          iconOnly()
+            ? "bg-transparent hover:bg-transparent text-quiet hover:text-ink"
+            : hasSurface()
+              ? "bg-transparent hover:bg-transparent"
+              : undefined
+        }
+        size={props.compact ? "compact" : "small"}
+        iconOnly={iconOnly()}
+        label={label()}
+        class="date-picker"
+        trigger={
+          <>
+            <Show when={props.kind === "when"} fallback={<Flag size={16} />}>
+              <Show
+                when={
+                  props.mode &&
+                  !iconOnly() &&
+                  [
+                    "Today",
+                    "This Evening",
+                    "Anytime",
+                    "Someday",
+                    "Inbox",
+                  ].includes(props.mode)
+                }
+                fallback={<CalendarDays size={16} class="text-muted" />}
+              >
+                <ListIcon name={props.mode!} size={16} />
+              </Show>
+            </Show>
+            <Show
+              when={
+                !iconOnly() &&
+                (!props.compact || props.kind === "when" || props.value)
               }
-              props.change(parsed.value, parsed.mode);
-              setQuery("");
-              setError("");
-              close();
-            }}
-          >
-            <Input
-              autofocus
-              aria-label={`${label()} date`}
-              placeholder={label()}
-              value={query()}
-              onInput={(e) => {
-                setQuery(e.currentTarget.value);
+            >
+              {text()}
+            </Show>
+          </>
+        }
+      >
+        {(close) => (
+          <>
+            <form
+              class="date-query [&>input]:min-h-8 [&>input]:px-2 [&>input]:py-1 [&>input]:text-xs"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const parsed = parse();
+                if (!parsed || (props.kind === "deadline" && !parsed.value)) {
+                  setError("Use today, tomorrow, a weekday, or YYYY-MM-DD.");
+                  return;
+                }
+                props.change(parsed.value, parsed.mode);
+                setQuery("");
                 setError("");
+                close();
               }}
-            />
-          </form>
-          <Show when={error()}>
-            <p
-              role="alert"
-              class="error-text mb-4 text-xs leading-relaxed text-danger"
             >
-              {error()}
-            </p>
-          </Show>
-          <Show when={props.kind === "when"}>
-            <div class="date-shortcuts grid grid-cols-1 gap-1.5 [&>button]:min-h-7 [&>button]:justify-start [&>button]:bg-transparent [&>button]:text-xs [&>button[aria-pressed=true]]:bg-selection [&>button[aria-pressed=true]]:text-accent">
-              <For each={["Today", "This Evening"]}>
-                {(mode) => (
+              <Input
+                variant="plain"
+                autofocus
+                aria-label={`${label()} date`}
+                placeholder={label()}
+                value={query()}
+                onInput={(e) => {
+                  setQuery(e.currentTarget.value);
+                  setError("");
+                }}
+              />
+            </form>
+            <Show when={error()}>
+              <p
+                role="alert"
+                class="error-text mb-4 text-xs leading-relaxed text-danger"
+              >
+                {error()}
+              </p>
+            </Show>
+            <div class="date-layout grid grid-cols-[--spacing(32)_minmax(0,1fr)] items-start gap-3">
+              <div class="date-options flex flex-col gap-2">
+                <Show when={props.kind === "when"}>
+                  <div class="date-shortcuts grid gap-1 [&>button]:min-h-8 [&>button]:justify-start [&>button]:rounded-md [&>button]:bg-transparent [&>button]:px-2 [&>button]:text-xs [&>button[aria-pressed=true]]:bg-selection">
+                    <For each={["Today", "This Evening", "Anytime", "Someday"]}>
+                      {(mode) => (
+                        <Button
+                          size="small"
+                          aria-pressed={props.mode === mode}
+                          onClick={() => {
+                            props.change("", mode);
+                            close();
+                          }}
+                        >
+                          <ListIcon name={mode} size={14} />
+                          {mode}
+                        </Button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <Show when={props.kind === "when"}>
                   <Button
                     size="small"
-                    aria-pressed={props.mode === mode}
+                    class="reminder-toggle justify-start text-muted"
+                    aria-expanded={reminderOpen()}
+                    onClick={() => setReminderOpen((open) => !open)}
+                  >
+                    <Bell size={14} />
+                    {props.reminder ? "Edit reminder" : "Add reminder"}
+                  </Button>
+                </Show>
+                <Show when={props.value || props.kind === "when"}>
+                  <Button
+                    size="small"
+                    class="justify-start"
                     onClick={() => {
-                      props.change("", mode);
+                      props.change(
+                        "",
+                        props.kind === "when" ? "Inbox" : undefined,
+                      );
                       close();
                     }}
                   >
-                    {mode === "Today" ? <Star size={14} /> : <Moon size={14} />}
-                    {mode}
+                    <Show
+                      when={props.kind === "when"}
+                      fallback={<X size={14} />}
+                    >
+                      <CalendarX size={14} />
+                    </Show>
+                    {props.kind === "when"
+                      ? "Clear schedule"
+                      : "Clear deadline"}
                   </Button>
-                )}
-              </For>
+                </Show>
+              </div>
+              <Calendar
+                value={
+                  props.value ||
+                  (props.kind === "when" &&
+                  ["Today", "This Evening"].includes(props.mode || "")
+                    ? date(today())
+                    : "")
+                }
+                choose={(value) => {
+                  props.change(value, "Date");
+                  close();
+                }}
+              />
             </div>
-          </Show>
-          <Calendar
-            value={props.value}
-            choose={(value) => {
-              props.change(value, "Date");
-              close();
-            }}
-          />
-          <Show when={props.kind === "when"}>
-            <div class="date-shortcuts date-secondary grid grid-cols-1 gap-1.5 [&>button]:min-h-7 [&>button]:justify-start [&>button]:bg-transparent [&>button]:text-xs [&>button[aria-pressed=true]]:bg-selection [&>button[aria-pressed=true]]:text-accent border-t border-hover pt-1.5">
-              <For each={["Anytime", "Someday"]}>
-                {(mode) => (
-                  <Button
-                    size="small"
-                    aria-pressed={props.mode === mode}
-                    onClick={() => {
-                      props.change("", mode);
-                      close();
-                    }}
-                  >
-                    <Archive size={14} />
-                    {mode}
-                  </Button>
-                )}
-              </For>
-            </div>
-            <Button
-              size="small"
-              class="reminder-toggle justify-start text-muted"
-              aria-expanded={reminderOpen()}
-              onClick={() => setReminderOpen((open) => !open)}
-            >
-              <Bell size={14} />
-              {props.reminder ? "Edit reminder" : "Add reminder"}
-            </Button>
-            <Show when={reminderOpen()}>
+            <Show when={props.kind === "when" && reminderOpen()}>
               <Show
                 when={props.changeReminder}
                 fallback={
@@ -328,7 +381,7 @@ export default function DatePicker(props: {
                       props.changeReminder?.(e.currentTarget.value)
                     }
                   />
-                  <small>
+                  <small class="text-quiet">
                     On this Mac while Somedue is open. Reminders stay on this
                     device.
                   </small>
@@ -343,20 +396,31 @@ export default function DatePicker(props: {
                 </Show>
               </Show>
             </Show>
-          </Show>
-          <Show when={props.value || props.kind === "when"}>
-            <Button
-              size="small"
-              onClick={() => {
-                props.change("", props.kind === "when" ? "Inbox" : undefined);
-                close();
-              }}
-            >
-              {props.kind === "when" ? "Clear schedule" : "Clear deadline"}
-            </Button>
-          </Show>
-        </>
-      )}
-    </Popover>
+          </>
+        )}
+      </Popover>
+      <Show
+        when={
+          props.clearable &&
+          (props.kind === "deadline"
+            ? props.value
+            : props.mode && props.mode !== "Inbox")
+        }
+      >
+        <IconButton
+          size="compact"
+          variant="quiet"
+          class="rounded-md bg-transparent hover:bg-transparent active:scale-100"
+          aria-label={
+            props.kind === "when" ? "Remove schedule" : "Remove deadline"
+          }
+          onClick={() =>
+            props.change("", props.kind === "when" ? "Inbox" : undefined)
+          }
+        >
+          <X size={13} />
+        </IconButton>
+      </Show>
+    </div>
   );
 }

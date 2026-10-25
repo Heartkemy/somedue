@@ -23,3 +23,22 @@ export function SectionHeading(props: JSX.HTMLAttributes<HTMLHeadingElement>) {
     />
   );
 }
+
+export function ListHeading(
+  props: JSX.HTMLAttributes<HTMLHeadingElement> & {
+    level?: "area" | "project" | "section";
+  },
+) {
+  const [local, rest] = splitProps(props, ["class", "level"]);
+  return (
+    <h2
+      {...rest}
+      class={twMerge(
+        "mt-7 mb-2 flex items-center gap-3 border-b border-hover pb-2 text-left text-lg leading-tight font-semibold text-ink first:mt-0",
+        local.level === "area" && "text-2xl",
+        local.level === "project" && "text-xl",
+        local.class,
+      )}
+    />
+  );
+}
