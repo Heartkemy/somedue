@@ -122,11 +122,14 @@ export function EveningIcon(props: { size?: number; class?: string }) {
       width={props.size || 16}
       height={props.size || 16}
       viewBox="0 0 24 24"
-      fill="currentColor"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linejoin="round"
       class={props.class}
       aria-hidden="true"
     >
-      <path d="M20.5 13.3A8.5 8.5 0 0 1 10.7 3.5a8.5 8.5 0 1 0 9.8 9.8Z" />
+      <path d="M20.9 16.6A9.5 9.5 0 0 1 15.4 3.1a9.5 9.5 0 1 0 5.5 13.5Z" />
     </svg>
   );
 }

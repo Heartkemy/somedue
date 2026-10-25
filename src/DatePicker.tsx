@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
+  CalendarX,
   X,
 } from "lucide-solid";
 import { Button, IconButton } from "./ui";
@@ -131,6 +132,7 @@ export default function DatePicker(props: {
   reminder?: string;
   changeReminder?: (value: string) => void;
   clearable?: boolean;
+  align?: "content";
 }) {
   const [query, setQuery] = createSignal("");
   const [error, setError] = createSignal("");
@@ -197,33 +199,41 @@ export default function DatePicker(props: {
     (props.kind === "deadline"
       ? !!props.value
       : !!props.mode && props.mode !== "Inbox");
+  const iconOnly = () =>
+    props.iconOnly ||
+    (props.clearable &&
+      props.kind === "when" &&
+      (!props.mode || props.mode === "Inbox"));
   return (
     <div
       class="schedule-chip flex min-w-0 items-center rounded-md transition-colors"
       classList={{
         "bg-hover hover:bg-ink/10": hasSurface(),
+        "-ml-1.5": props.align === "content" && !!iconOnly(),
+        "-ml-2": props.align === "content" && !iconOnly() && !!props.compact,
+        "-ml-3": props.align === "content" && !iconOnly() && !props.compact,
       }}
     >
       <Popover
         width={400}
         triggerClass={
-          props.iconOnly
+          iconOnly()
             ? "bg-transparent hover:bg-transparent text-quiet hover:text-ink"
             : hasSurface()
               ? "bg-transparent hover:bg-transparent"
               : undefined
         }
         size={props.compact ? "compact" : "small"}
-        iconOnly={props.iconOnly}
+        iconOnly={iconOnly()}
         label={label()}
         class="date-picker"
         trigger={
           <>
-            <Show when={props.kind === "when"} fallback={<Flag size={14} />}>
+            <Show when={props.kind === "when"} fallback={<Flag size={16} />}>
               <Show
                 when={
                   props.mode &&
-                  !props.iconOnly &&
+                  !iconOnly() &&
                   [
                     "Today",
                     "This Evening",
@@ -232,14 +242,14 @@ export default function DatePicker(props: {
                     "Inbox",
                   ].includes(props.mode)
                 }
-                fallback={<CalendarDays size={14} class="text-muted" />}
+                fallback={<CalendarDays size={16} class="text-muted" />}
               >
-                <ListIcon name={props.mode!} size={14} />
+                <ListIcon name={props.mode!} size={16} />
               </Show>
             </Show>
             <Show
               when={
-                !props.iconOnly &&
+                !iconOnly() &&
                 (!props.compact || props.kind === "when" || props.value)
               }
             >
@@ -329,6 +339,12 @@ export default function DatePicker(props: {
                       close();
                     }}
                   >
+                    <Show
+                      when={props.kind === "when"}
+                      fallback={<X size={14} />}
+                    >
+                      <CalendarX size={14} />
+                    </Show>
                     {props.kind === "when"
                       ? "Clear schedule"
                       : "Clear deadline"}

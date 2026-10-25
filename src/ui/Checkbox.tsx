@@ -24,19 +24,21 @@ export function CheckButton(
     checked?: boolean;
     canceled?: boolean;
     dashed?: boolean;
+    ringed?: boolean;
   },
 ) {
   const [local, rest] = splitProps(props, [
     "checked",
     "canceled",
     "dashed",
+    "ringed",
     "class",
   ]);
   return (
     <Button
       {...rest}
       variant="bare"
-      aria-pressed={!!local.checked}
+      aria-pressed={rest.role === "checkbox" ? undefined : !!local.checked}
       data-someday={local.dashed || undefined}
       class={twMerge(
         "task-check relative grid size-4 min-h-4 shrink-0 place-items-center justify-self-center rounded-full bg-transparent p-0 text-mint hover:bg-mint/10",
@@ -53,7 +55,11 @@ export function CheckButton(
           cx="10"
           cy="10"
           r="9"
-          fill={local.checked && !local.canceled ? "currentColor" : "none"}
+          fill={
+            local.checked && !local.canceled && !local.ringed
+              ? "currentColor"
+              : "none"
+          }
           stroke="currentColor"
           stroke-width="1.5"
           stroke-dasharray={
@@ -61,6 +67,9 @@ export function CheckButton(
           }
           stroke-linecap="round"
         />
+        <Show when={local.checked && !local.canceled && local.ringed}>
+          <circle cx="10" cy="10" r="6" fill="currentColor" />
+        </Show>
       </svg>
       <Show when={local.checked}>
         <span

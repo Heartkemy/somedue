@@ -1,5 +1,6 @@
 import { Show, type JSX } from "solid-js";
-import { Button, CheckButton } from "./ui";
+import { MoreHorizontal } from "lucide-solid";
+import { Button, CheckButton, IconButton } from "./ui";
 import {
   container,
   isHeading,
@@ -25,6 +26,7 @@ export default function TaskRow(props: {
   showContainer: boolean;
   dropEdge?: "before" | "after";
   schedule: JSX.Element;
+  select: (event: MouseEvent) => void;
   open: (event: MouseEvent | KeyboardEvent) => void;
   focus: () => void;
   complete: (cancel: boolean) => void;
@@ -73,10 +75,20 @@ export default function TaskRow(props: {
         if (
           !(e.target as HTMLElement).closest("button,input,[data-row-control]")
         )
+          props.select(e);
+      }}
+      onDblClick={(e) => {
+        if (
+          !(e.target as HTMLElement).closest("button,input,[data-row-control]")
+        )
           props.open(e);
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && e.target === e.currentTarget) {
+        if (
+          e.key === "Enter" &&
+          e.target === e.currentTarget &&
+          props.selected
+        ) {
           e.preventDefault();
           e.stopPropagation();
           props.open(e);
@@ -91,6 +103,7 @@ export default function TaskRow(props: {
               checked={!!props.item.props.ss}
               canceled={props.item.props.ss === 2}
               dashed={isSomeday(props.item)}
+              ringed={isProject(props.item)}
               class={
                 isProject(props.item)
                   ? "text-project hover:bg-project/10"
@@ -141,7 +154,7 @@ export default function TaskRow(props: {
             : "Date unavailable"}
         </span>
       </Show>
-      <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1">
+      <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1 group-[.heading]/task:border-b group-[.heading]/task:border-hover group-[.heading]/task:pb-3">
         <div class="task-summary flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <Show when={props.isNew && !isHeading(props.item)}>
             <span
@@ -150,7 +163,7 @@ export default function TaskRow(props: {
               aria-label="New in Today"
             />
           </Show>
-          <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:text-base group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">
+          <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:text-2xl group-[.heading]/task:leading-tight group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">
             {props.name || title(props.item)}
           </span>
           <TaskMetadata item={props.item} all={props.all} />
@@ -164,6 +177,17 @@ export default function TaskRow(props: {
           </span>
         </Show>
       </div>
+      <Show when={isHeading(props.item)}>
+        <IconButton
+          size="compact"
+          variant="quiet"
+          aria-label="Heading actions"
+          aria-haspopup="menu"
+          onClick={props.context}
+        >
+          <MoreHorizontal size={16} />
+        </IconButton>
+      </Show>
       <Show
         when={
           !props.item.props.ss &&

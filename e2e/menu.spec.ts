@@ -27,7 +27,7 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
   });
   await page.getByRole("button", { name: "Sync now", exact: true }).click();
   await page.locator(".project-nav").click();
-  await page.locator("#item-h").click();
+  await page.locator("#item-h").dblclick();
   await expect(page.getByRole("button", { name: "Save heading" })).toHaveCount(
     0,
   );
@@ -77,7 +77,7 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
     "background-color",
     "rgba(0, 0, 0, 0)",
   );
-  await page.locator("#item-t .task-title").click();
+  await page.locator("#item-t .task-title").dblclick();
   await page
     .getByRole("button", { name: "To-do actions", exact: true })
     .click();

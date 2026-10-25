@@ -55,7 +55,7 @@ for (const width of [1120, 760])
           .querySelector(".sidebar")!
           .getBoundingClientRect(),
         toggle = document
-          .querySelector('[aria-label="Sidebar width"]')!
+          .querySelector(".sidebar-resize-handle")!
           .getBoundingClientRect();
       const tools = document
         .querySelector(".top-tools")!

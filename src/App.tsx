@@ -41,6 +41,7 @@ import {
   ArrowRight,
   ListChecks,
   FileText,
+  GripHorizontal,
 } from "lucide-solid";
 import TaskRow from "./TaskRow";
 import SettingsPage from "./SettingsPage";
@@ -1146,7 +1147,27 @@ export default function App() {
     }
   }
   onMount(() => {
+    let handoffClick:
+      { id: string; x: number; y: number; time: number } | undefined;
     const saveOutside = (e: MouseEvent) => {
+      // Closing an editor moves the next row between the two clicks; keep the original target.
+      if (
+        handoffClick &&
+        !editing() &&
+        e.button === 0 &&
+        e.timeStamp - handoffClick.time < 400 &&
+        Math.abs(e.clientX - handoffClick.x) <= 4 &&
+        Math.abs(e.clientY - handoffClick.y) <= 4
+      ) {
+        const item = items().find((item) => item.id === handoffClick!.id);
+        handoffClick = undefined;
+        if (item) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          openItem(item);
+          return;
+        }
+      }
       const target = e.target;
       if (
         !editing() ||
@@ -1169,11 +1190,17 @@ export default function App() {
         rowId && !control
           ? items().find((item) => item.id === rowId)
           : undefined;
-      if (item && !isProject(item)) {
-        instantEditor = item.id;
+      if (item) {
+        handoffClick = {
+          id: item.id,
+          x: e.clientX,
+          y: e.clientY,
+          time: e.timeStamp,
+        };
+        if (!isProject(item)) instantEditor = item.id;
         batch(() => {
           setSelected(item.id);
-          setEditing(item.id);
+          setEditing("");
         });
         return;
       }
@@ -1184,8 +1211,7 @@ export default function App() {
         if (rowId && !control) {
           const item = all().find((item) => item.id === rowId);
           if (item) {
-            if (!isProject(item) && !isHeading(item)) instantEditor = item.id;
-            openItem(item);
+            setSelected(item.id);
           }
         } else if (target.isConnected)
           (
@@ -1198,8 +1224,19 @@ export default function App() {
       if (!(e.target as HTMLElement).closest(".list-menu,.toolbar-actions"))
         setMenu(false);
     };
+    const deselectOutside = (e: MouseEvent) => {
+      if (
+        !editing() &&
+        e.target instanceof Element &&
+        !e.target.closest(
+          ".task-row,.task-editor,.inline-heading-editor,.editor-footer,.control-popover,.select-popup,dialog,button,a,input,textarea,[role=separator]",
+        )
+      )
+        setSelected("");
+    };
     document.addEventListener("pointerdown", dismiss);
     document.addEventListener("click", saveOutside, true);
+    document.addEventListener("click", deselectOutside);
     document.addEventListener("keydown", key);
     let unlisten: undefined | (() => void);
     let unlistenWorkspace: undefined | (() => void);
@@ -1252,6 +1289,7 @@ export default function App() {
       document.removeEventListener("keydown", key);
       document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("click", saveOutside, true);
+      document.removeEventListener("click", deselectOutside);
       unlisten?.();
       unlistenWorkspace?.();
       unlistenSyncError?.();
@@ -1352,8 +1390,8 @@ export default function App() {
           data-tauri-drag-region
         ></div>
         <div
-          class="sidebar-resizer absolute top-1/2 z-30 grid h-16 w-6 -translate-y-1/2 cursor-col-resize touch-none place-items-center rounded-full outline-none after:h-12 after:w-2 after:rounded-full after:bg-quiet/35 hover:after:bg-quiet/65 focus-visible:after:bg-quiet"
-          style={{ left: `${sidebar() ? sidebarWidth() + 4 : 0}px` }}
+          class="sidebar-resizer group/resize absolute inset-y-0 z-30 w-5 cursor-col-resize touch-none outline-none"
+          style={{ left: `${sidebar() ? sidebarWidth() - 4 : 0}px` }}
           role="separator"
           aria-label="Sidebar width"
           aria-orientation="vertical"
@@ -1389,7 +1427,9 @@ export default function App() {
               void persistSidebarWidth(width);
             }
           }}
-        />
+        >
+          <span class="sidebar-resize-handle pointer-events-none absolute top-1/2 left-2 h-12 w-2 -translate-y-1/2 rounded-full bg-quiet/35 opacity-0 transition-opacity group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 [@media(hover:none)]:opacity-100" />
+        </div>
         <Show when={sidebar()}>
           <aside
             class="sidebar relative col-start-1 row-span-full row-start-1 flex min-h-0 min-w-0 flex-col bg-linear-to-b from-sidebar-start to-sidebar-end pt-14"
@@ -1549,7 +1589,8 @@ export default function App() {
               </NavigationItem>
               <IconButton
                 size="small"
-                class="ml-auto"
+                variant="quiet"
+                class="ml-auto hover:bg-transparent"
                 aria-label="Settings"
                 onClick={() => openSettings()}
               >
@@ -1801,12 +1842,12 @@ export default function App() {
             }
           >
             <section
-              class="list-page relative min-h-0 flex-1 overflow-auto px-11 pt-14 pb-9 max-lg:px-7 max-lg:pb-8"
+              class="list-page relative min-h-0 flex-1 overflow-auto pl-16 pr-11 pt-14 pb-9 max-lg:pr-7 max-lg:pb-8"
               data-list={list()}
             >
               <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
                 <div class="heading-line flex items-baseline gap-3">
-                  <span class="page-symbol flex h-7 w-4 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
+                  <span class="page-symbol flex h-8 w-4 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-8 [&>svg]:shrink-0 [&>svg]:stroke-1 [&>.project-ring]:size-8">
                     {list() === "Inbox" ? (
                       <Inbox />
                     ) : list() === "Today" ? (
@@ -1859,7 +1900,7 @@ export default function App() {
                 </Show>
                 <div class="header-controls mt-3 flex items-start gap-2.5 empty:hidden">
                   <Show when={current()}>
-                    <div class="list-tag-editor shrink-0">
+                    <div class="list-tag-editor -ml-1.5 shrink-0">
                       <TagPicker
                         label="List tags"
                         compact
@@ -1935,6 +1976,7 @@ export default function App() {
                   <Button
                     size="small"
                     variant="quiet"
+                    align="content"
                     aria-pressed={upcomingCalendar()}
                     classList={{ "bg-selection": upcomingCalendar() }}
                     onClick={() => setUpcomingCalendar(true)}
@@ -2187,6 +2229,12 @@ export default function App() {
                                             !selection().includes(item.id)
                                           )
                                             setSelected(item.id);
+                                        }}
+                                        select={(e) => {
+                                          if (
+                                            Date.now() >= suppressRowClickUntil
+                                          )
+                                            selectItem(item, e);
                                         }}
                                         open={(e) => {
                                           if (
@@ -2805,7 +2853,7 @@ export default function App() {
     });
     return (
       <div
-        class="heading inline-heading-editor -mx-3 mt-6 mb-2 flex min-h-12 items-center gap-2 rounded-xl bg-surface px-3 py-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:text-base [&>input]:font-semibold [&>input]:text-accent"
+        class="heading inline-heading-editor -mx-3 mt-6 mb-2 flex min-h-12 items-center gap-2 rounded-xl bg-surface px-3 py-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:text-2xl [&>input]:font-semibold [&>input]:text-accent"
         onFocusOut={(event) => {
           if (
             event.relatedTarget instanceof Node &&
@@ -3355,6 +3403,16 @@ export default function App() {
     const session = editorSaves.retain(item, read);
     currentEditor = session;
     let editor!: HTMLDivElement;
+    const [dragCheck, setDragCheck] = createSignal("");
+    const reorderCheck = (id: string, direction: number) =>
+      setChecks((rows) => {
+        const index = rows.findIndex((row) => row.id === id),
+          target = index + direction;
+        if (index < 0 || target < 0 || target >= rows.length) return rows;
+        const next = [...rows];
+        [next[index], next[target]] = [next[target], next[index]];
+        return next;
+      });
     onMount(() =>
       setEditorActions({
         move: () =>
@@ -3753,26 +3811,47 @@ export default function App() {
             <Markdown text={notes()} onError={setError} />
           </Show>
         </div>
-        <div
-          class="checklist ml-7 flex flex-col gap-1.5"
-          hidden={!checks().length}
-        >
+        <div class="checklist ml-7 flex flex-col" hidden={!checks().length}>
           <For each={checks()}>
             {(c) => (
               <div
-                class="check-row flex min-w-0 items-center gap-2.5 [&>input:not([type=checkbox])]:min-h-9 [&>input:not([type=checkbox])]:flex-1 [&>input:not([type=checkbox])]:rounded-lg [&>input:not([type=checkbox])]:px-0 [&>input:not([type=checkbox])]:py-2 [&>input:not([type=checkbox])]:text-sm [&>input:checked+input]:text-quiet [&>input:checked+input]:line-through"
+                class="check-row group/check flex min-w-0 items-center gap-3 border-b border-hover first:border-t [&>input]:min-h-9 [&>input]:flex-1 [&>input]:rounded-lg [&>input]:px-0 [&>input]:py-2 [&>input]:text-sm [&>button[aria-checked=true]+input]:text-quiet [&>button[aria-checked=true]+input]:line-through"
                 data-check-id={c.id}
+                onDragOver={(e) => {
+                  if (dragCheck()) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const id =
+                    dragCheck() ||
+                    e.dataTransfer?.getData("application/x-somedue-checklist");
+                  setDragCheck("");
+                  if (!id || id === c.id) return;
+                  const rect = e.currentTarget.getBoundingClientRect(),
+                    after = e.clientY > rect.top + rect.height / 2;
+                  setChecks((rows) => {
+                    const moved = rows.find((row) => row.id === id);
+                    if (!moved) return rows;
+                    const next = rows.filter((row) => row.id !== id);
+                    next.splice(
+                      next.findIndex((row) => row.id === c.id) + Number(after),
+                      0,
+                      moved,
+                    );
+                    return next;
+                  });
+                }}
               >
-                <Checkbox
+                <CheckButton
+                  role="checkbox"
                   aria-label={`Complete checklist ${c.title}`}
-                  type="checkbox"
+                  aria-checked={c.done}
                   checked={c.done}
-                  onChange={(e) =>
+                  onClick={() =>
                     setChecks((v) =>
                       v.map((x) =>
-                        x.id === c.id
-                          ? { ...x, done: e.currentTarget.checked }
-                          : x,
+                        x.id === c.id ? { ...x, done: !x.done } : x,
                       ),
                     )
                   }
@@ -3814,28 +3893,55 @@ export default function App() {
                     }
                     if (e.altKey && ["ArrowUp", "ArrowDown"].includes(e.key)) {
                       e.preventDefault();
-                      setChecks((rows) => {
-                        const i = rows.findIndex((x) => x.id === c.id),
-                          j = i + (e.key === "ArrowUp" ? -1 : 1);
-                        if (j < 0 || j >= rows.length) return rows;
-                        const next = [...rows];
-                        [next[i], next[j]] = [next[j], next[i]];
-                        return next;
-                      });
+                      reorderCheck(c.id, e.key === "ArrowUp" ? -1 : 1);
                       focusCheck(c.id);
                     }
                   }}
                 />
-                <IconButton
-                  size="compact"
-                  variant="quiet"
-                  aria-label="Remove checklist item"
-                  onClick={() =>
-                    setChecks((v) => v.filter((x) => x.id !== c.id))
-                  }
-                >
-                  <X size={13} />
-                </IconButton>
+                <div class="ml-auto flex items-center gap-1">
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    class="opacity-0 group-hover/check:opacity-100 group-focus-within/check:opacity-100"
+                    aria-label="Remove checklist item"
+                    onClick={() =>
+                      setChecks((v) => v.filter((x) => x.id !== c.id))
+                    }
+                  >
+                    <X size={13} />
+                  </IconButton>
+                  <IconButton
+                    size="compact"
+                    variant="quiet"
+                    class="cursor-grab active:cursor-grabbing"
+                    aria-label="Reorder checklist item"
+                    title="Drag to reorder · Option ↑ / ↓"
+                    draggable="true"
+                    onDragStart={(e) => {
+                      setDragCheck(c.id);
+                      if (e.dataTransfer) {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData(
+                          "application/x-somedue-checklist",
+                          c.id,
+                        );
+                      }
+                    }}
+                    onDragEnd={() => setDragCheck("")}
+                    onKeyDown={(e) => {
+                      if (
+                        e.altKey &&
+                        ["ArrowUp", "ArrowDown"].includes(e.key)
+                      ) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        reorderCheck(c.id, e.key === "ArrowUp" ? -1 : 1);
+                      }
+                    }}
+                  >
+                    <GripHorizontal size={16} />
+                  </IconButton>
+                </div>
               </div>
             )}
           </For>
@@ -3854,6 +3960,7 @@ export default function App() {
           <DatePicker
             compact
             clearable
+            align="content"
             kind="when"
             reminder={reminder()}
             changeReminder={setReminder}

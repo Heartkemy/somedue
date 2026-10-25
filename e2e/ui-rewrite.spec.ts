@@ -77,7 +77,7 @@ for (const width of [1120, 760])
           .querySelector("#item-b .task-title")!
           .getBoundingClientRect().x,
       }));
-      await page.locator("#item-a .task-title").click();
+      await page.locator("#item-a .task-title").dblclick();
       const footerAfter = await page
         .locator(".editor-footer-actions > *")
         .evaluateAll((elements) =>
@@ -127,7 +127,7 @@ for (const width of [1120, 760])
       await expect(page.locator(".task-editor")).toHaveCount(0);
       expect(await page.evaluate(() => (window as any).__MUTATIONS__)).toBe(0);
       await expect(page.locator(".toast")).toHaveCount(0);
-      await page.locator("#item-a .task-title").click();
+      await page.locator("#item-a .task-title").dblclick();
       await notes.fill("Updated notes");
       await page.locator("h1").click();
       await expect(page.locator(".task-editor")).toHaveCount(0);
@@ -306,7 +306,7 @@ for (const width of [1120, 760])
       await expect(
         page.getByRole("button", { name: "Sync now", exact: true }),
       ).toBeDisabled();
-      await page.locator("#item-a .task-title").click();
+      await page.locator("#item-a .task-title").dblclick();
       await page
         .getByRole("textbox", { name: "To-do title" })
         .fill("Edited during sync");
@@ -318,7 +318,7 @@ for (const width of [1120, 760])
       await expect(page.locator("#item-a .task-title")).toHaveText(
         "Edited during sync",
       );
-      await page.locator("#item-b .task-title").click();
+      await page.locator("#item-b .task-title").dblclick();
       await page
         .getByRole("textbox", { name: "To-do title" })
         .fill("Local title");

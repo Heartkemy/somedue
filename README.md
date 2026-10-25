@@ -26,6 +26,10 @@ endorsed by Cultured Code, the makers of Things.
   Mac; optional Things Cloud sync includes conflict and draft recovery controls.
 - **Set local reminders:** notifications fire while Somedue is running.
 
+Click a to-do to select it. Press Enter or double-click to edit it; click empty
+space to clear the selection. Drag checklist items by their right-hand handles,
+or use Option ↑ / ↓ while editing an item.
+
 ## Current limitations
 
 Somedue does not yet implement everything Things can do. Advanced repeating-task

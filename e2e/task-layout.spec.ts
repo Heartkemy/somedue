@@ -93,7 +93,7 @@ for (const width of [1120, 760])
         path: info.outputPath("project-gutters-and-groups.png"),
         animations: "disabled",
       });
-      await page.locator("#item-a .task-title").click();
+      await page.locator("#item-a .task-title").dblclick();
       await expect(
         page.getByRole("textbox", { name: "To-do title" }),
       ).toHaveValue("First actionable task");

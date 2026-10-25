@@ -54,10 +54,11 @@ export default function TagPicker(props: {
         size={props.compact ? "compact" : "small"}
         label={props.label || "Tags"}
         class="tag-dropdown"
+        iconOnly={props.compact}
         width={248}
         trigger={
           <>
-            <Tag size={14} />
+            <Tag size={16} />
             <Show when={!props.compact}>Tags</Show>
           </>
         }

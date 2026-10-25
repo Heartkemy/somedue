@@ -18,29 +18,29 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: "Sync now", exact: true }).click();
 });
 
-test("click-away saves the first editor and opens the clicked row; failure preserves the draft", async ({
+test("double-click handoff saves the first editor and opens the next; failure preserves the draft", async ({
   page,
 }) => {
   const title = page.getByRole("textbox", { name: "To-do title" });
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await title.fill("Saved first");
-  await page.locator("#item-b .task-title").click();
+  await page.locator("#item-b .task-title").dblclick();
   await expect(title).toHaveValue("b");
   await expect(page.locator("#item-a .task-title")).toHaveText("Saved first");
   await title.fill("Keep this draft");
   await page.evaluate(() => ((window as any).__TEST_FAIL__ = true));
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await expect(title).toHaveValue("Saved first");
   await expect(page.locator(".error")).toContainText("not saved");
   await page.evaluate(() => ((window as any).__TEST_FAIL__ = false));
-  await page.locator("#item-b .task-title").click();
+  await page.locator("#item-b .task-title").dblclick();
   await expect(title).toHaveValue("Keep this draft");
   await page.locator("h1").click();
   await expect(page.locator(".task-editor")).toHaveCount(0);
   await expect(page.locator("#item-b .task-title")).toHaveText(
     "Keep this draft",
   );
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await title.fill("Save before toolbar action");
   await page.locator('[aria-label="List options"] svg').click();
   await expect(page.locator(".list-menu")).toBeVisible();
@@ -52,7 +52,7 @@ test("click-away saves the first editor and opens the clicked row; failure prese
 test("editor controls occupy the footer and routine saves remain silent", async ({
   page,
 }) => {
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await expect(page.locator(".task-editor .editor-footer")).toHaveCount(0);
   await expect(
     page.locator(".list-footer .editor-move > button"),
@@ -110,11 +110,11 @@ test("rapid editor handoffs stay instant and never start Cloud sync between edit
     };
     document.getAnimations().forEach((animation) => animation.finish());
   });
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await page
     .getByRole("textbox", { name: "To-do title" })
     .fill("First saved edit");
-  await page.locator("#item-b .task-title").click();
+  await page.locator("#item-b .task-title").dblclick();
   await expect(page.getByRole("textbox", { name: "To-do title" })).toHaveValue(
     "b",
   );
@@ -128,7 +128,7 @@ test("rapid editor handoffs stay instant and never start Cloud sync between edit
   await page
     .getByRole("textbox", { name: "To-do title" })
     .fill("Second saved edit");
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await expect(page.getByRole("textbox", { name: "To-do title" })).toHaveValue(
     "First saved edit",
   );
@@ -138,28 +138,14 @@ test("rapid editor handoffs stay instant and never start Cloud sync between edit
     .toBe(1);
 });
 
-test("handoff opens the clicked editor before the previous save resolves, without a selected frame", async ({
+test("selection and Enter open the next editor before the previous save resolves", async ({
   page,
 }, info) => {
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await page.getByRole("textbox", { name: "To-do title" }).fill("Unsaved A");
   await page.evaluate(() => {
     const w = window as any,
       invoke = w.__TAURI_INTERNALS__.invoke;
-    w.__HANDOFF_FRAMES__ = [];
-    const record = () =>
-      w.__HANDOFF_FRAMES__.push({
-        selected: !!document.querySelector("#item-b.selected"),
-        editor: (
-          document.querySelector(
-            '[aria-label="To-do title"]',
-          ) as HTMLInputElement
-        )?.value,
-      });
-    new MutationObserver(record).observe(
-      document.querySelector(".task-list")!,
-      { subtree: true, childList: true, attributes: true },
-    );
     w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
       if (command === "mutate" && !w.__SAVE_GATE_USED__) {
         w.__SAVE_GATE_USED__ = true;
@@ -171,12 +157,14 @@ test("handoff opens the clicked editor before the previous save resolves, withou
     };
   });
   await page.locator("#item-b .task-title").click();
+  await expect(page.locator("#item-b")).toHaveAttribute("aria-current", "true");
+  await expect(page.locator(".task-editor")).toHaveCount(0);
+  await page.keyboard.press("Enter");
   const duringSave = await page.evaluate(() => ({
     title: (
       document.querySelector('[aria-label="To-do title"]') as HTMLInputElement
     )?.value,
     pending: (window as any).__SAVE_PENDING__,
-    frames: (window as any).__HANDOFF_FRAMES__,
   }));
   await page.screenshot({
     path: info.outputPath("handoff-before-save.png"),
@@ -185,11 +173,6 @@ test("handoff opens the clicked editor before the previous save resolves, withou
   await page.evaluate(() => (window as any).__RELEASE_SAVE__());
   expect(duringSave.pending).toBe(true);
   expect(duringSave.title).toBe("b");
-  expect(
-    duringSave.frames.some(
-      (frame: any) => frame.selected && frame.editor !== "b",
-    ),
-  ).toBe(false);
   await expect(page.getByRole("textbox", { name: "To-do title" })).toHaveValue(
     "b",
   );
@@ -199,7 +182,7 @@ test("a failed background save keeps the new editor and restores all old draft f
   page,
 }) => {
   const title = page.getByRole("textbox", { name: "To-do title" });
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await title.fill("Retained A");
   await page
     .getByRole("textbox", { name: "Notes", exact: true })
@@ -223,7 +206,7 @@ test("a failed background save keeps the new editor and restores all old draft f
       return invoke(command, args);
     };
   });
-  await page.locator("#item-b .task-title").click();
+  await page.locator("#item-b .task-title").dblclick();
   await expect(title).toHaveValue("b");
   await title.fill("Current B typing");
   await page.evaluate(() => (window as any).__REJECT_SAVE__());
@@ -231,7 +214,7 @@ test("a failed background save keeps the new editor and restores all old draft f
     "Delayed persistence failed",
   );
   await expect(title).toHaveValue("Current B typing");
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await expect(title).toHaveValue("Retained A");
   await expect(
     page.getByRole("textbox", { name: "Notes", exact: true }),
@@ -256,7 +239,7 @@ test("late save completion cannot reset typing after rapid A-B-A handoffs", asyn
   page,
 }) => {
   const title = page.getByRole("textbox", { name: "To-do title" });
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await title.fill("Pending A");
   await page.evaluate(() => {
     const w = window as any,
@@ -269,9 +252,9 @@ test("late save completion cannot reset typing after rapid A-B-A handoffs", asyn
       return invoke(command, args);
     };
   });
-  await page.locator("#item-b .task-title").click();
+  await page.locator("#item-b .task-title").dblclick();
   await title.fill("Pending B");
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   await expect(title).toHaveValue("Pending A");
   await title.fill("Latest A typing");
   await page.evaluate(() => (window as any).__RELEASE_SAVE__());
@@ -316,7 +299,7 @@ test("a new draft can hand off before creation finishes and late creation keeps 
       return invoke(command, args);
     };
   });
-  await page.locator("#item-a .task-title").click();
+  await page.locator("#item-a .task-title").dblclick();
   expect(await title.inputValue()).toBe("a");
   await title.fill("Current item typing");
   await page.evaluate(() => (window as any).__RELEASE_SAVE__());

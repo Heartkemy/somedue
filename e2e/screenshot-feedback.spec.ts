@@ -154,7 +154,7 @@ for (const theme of ["dark", "light"])
       test("scheduling card fits without scrolling and its chip clears; pickers and settings use contextual UI", async ({
         page,
       }, info) => {
-        await page.locator("#item-a .task-title").click();
+        await page.locator("#item-a .task-title").dblclick();
         const title = page.getByRole("textbox", { name: "To-do title" });
         await expect(title).toHaveCSS("box-shadow", "none");
         const whenTrigger = page
@@ -181,7 +181,10 @@ for (const theme of ["dark", "light"])
         await page
           .getByRole("button", { name: "Remove schedule", exact: true })
           .click();
-        await expect(whenTrigger).toHaveText("Inbox");
+        await expect(whenTrigger).toHaveText("");
+        await expect(whenTrigger.locator("svg")).toHaveClass(
+          /lucide-calendar-days/,
+        );
         await page.locator("h1").click();
         await page.locator("#item-a").focus();
         await page
@@ -245,7 +248,7 @@ for (const theme of ["dark", "light"])
         await page
           .getByRole("button", { name: "Upcoming", exact: true })
           .click();
-        await page.locator("#item-template .task-title").click();
+        await page.locator("#item-template .task-title").dblclick();
         await expect(
           page
             .locator(".task-editor")

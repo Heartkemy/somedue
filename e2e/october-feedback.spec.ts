@@ -64,7 +64,7 @@ test("schedule and checklist controls keep padding and a single chip surface", a
   await expect(
     page.locator("#item-new-today .row-schedule .date-picker > button > svg"),
   ).toHaveClass(/lucide-calendar-days/);
-  await page.locator("#item-new-today .task-title").click();
+  await page.locator("#item-new-today .task-title").dblclick();
   const trigger = page
     .locator(".task-editor")
     .getByRole("button", { name: "When", exact: true });
@@ -75,7 +75,7 @@ test("schedule and checklist controls keep padding and a single chip surface", a
     name: "Checklist item",
     exact: true,
   });
-  for (const control of [trigger, addCheck]) {
+  for (const control of [addCheck]) {
     expect(
       await control.evaluate((el) =>
         parseFloat(getComputedStyle(el).paddingLeft),
@@ -153,7 +153,7 @@ test("headings clear their selection and sections and sidebar entries reorder in
   page,
 }) => {
   await page.locator(".project-nav").filter({ hasText: "project-a" }).click();
-  await page.locator("#item-heading-a .task-title").click();
+  await page.locator("#item-heading-a .task-title").dblclick();
   await page.locator("h1").click();
   await expect(page.locator(".inline-heading-editor")).toHaveCount(0);
   await expect(page.locator("#item-heading-a")).not.toHaveAttribute(

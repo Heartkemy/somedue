@@ -126,14 +126,14 @@ for (const width of [1120, 760])
         animations: "disabled",
       });
     });
-    test("single click, draft move, checklist, reminder persistence and conversion", async ({
+    test("double click, draft move, checklist, reminder persistence and conversion", async ({
       page,
     }, info) => {
       await page
         .locator(".sidebar .project-nav")
         .filter({ hasText: "Launch" })
         .click();
-      await page.locator("#item-t .task-title").click();
+      await page.locator("#item-t .task-title").dblclick();
       await expect(
         page.getByRole("textbox", { name: "To-do title" }),
       ).toHaveValue("Write proposal");
@@ -261,7 +261,7 @@ for (const width of [1120, 760])
       expect(loggedGeometry.controlsBottom).toBeLessThanOrEqual(
         loggedGeometry.rowTop,
       );
-      await page.locator("#item-h").click();
+      await page.locator("#item-h").dblclick();
       await page
         .getByRole("textbox", { name: "Heading title" })
         .fill("Ready to ship");
