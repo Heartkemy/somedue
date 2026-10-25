@@ -80,3 +80,54 @@ Live Things Cloud traffic and physical native traffic-light placement were not
 retested. The supported traffic-light position is configured and compiles. The
 existing app process was preserved to avoid losing an open draft; quit and reopen
 Somedue to load the update. Local certificate signing is not notarization.
+
+## Ordered screenshot feedback — 2026-10-25
+
+Samlad task #999 curates input `in_5afc1a4e4d954a0fa6d73abf6e497163`
+and the instruction to continue on `feature/ui-reference-rewrite`. All 39
+chronological Desktop references were inspected.
+
+- The sidebar's centered handle resizes, collapses and reopens it, including by
+  keyboard. The redundant title-bar button is removed.
+- Adjacent selected rows join into one surface. Rows and editors share padded
+  checkbox/title columns; heading edits save without confirmation controls.
+  Project progress and completed project controls use the logo's exact `#DC00FF`.
+- Today acknowledges existing items newly scheduled into it. Evening sections
+  use neutral type and moon icons. Upcoming includes 30 consecutive dates and
+  offers a scheduled-only switch. Anytime groups tasks with expandable previews.
+- Trash includes blank-title tasks and repeating templates, sorts newest first,
+  and has a confirmed Empty Trash action that also removes dangling series links.
+- Scheduling uses a wider, non-scrolling card with shared navigation colors and
+  removable chips. Quick Find and Move use compact contextual rows. Toolbar
+  columns and pill-shaped controls keep the same centers while editing.
+- Settings follows the sibling Samlad layout: contextual Back, breadcrumbs,
+  section descriptions, content hierarchy and a yellow active underline.
+- Simple recurring tasks have distinct templates/copies, an explicit rule dialog,
+  next/previous copy actions, pause/resume and stop. Daily, weekly, monthly, yearly,
+  after-completion and end-date rules have offline pipeline coverage. Local
+  recurring reminder preferences stay outside the Cloud recurrence wire payload.
+
+### Verification
+
+- TypeScript production build, `--noUnusedLocals`, Prettier and diff checks pass.
+- 37 Bun tests and 66 offline Rust tests pass. Coverage includes empty-day/list
+  grouping, month-end previews, bounded recurrence catch-up, deduplication,
+  completion-relative scheduling, end dates, pause and reset checklist copies.
+- All 132 distinct Chromium/WebKit cases pass across the full run and targeted
+  confirmations at 1120×780 and 760×540. The full run passed 128 cases; the four
+  chip-height failures were fixed and all 40 affected/list/theme cases passed.
+  Both heading cases then passed with additional autosave assertions.
+- Two bounded visual rounds inspected dark/light task lists, scheduling,
+  Quick Find, settings and recurring-rule dialogs. The mechanical design detector
+  returned no findings. Artifacts are under ignored `out/ui-reference-feedback/`.
+- The new section layout keys by stable section IDs. Existing draft recovery,
+  delayed persistence, click-away saves and tag creation remain covered.
+
+### Limits
+
+This pass did not install or launch a native build, open the user's task database,
+access credentials, or contact a live Cloud account. The installed app therefore
+remains the earlier build. Opaque `rp` repeaters, advanced imported rule variants
+and automatic copying of repeating projects still require Things; the app
+preserves them and rejects unsupported rule changes. Simple rule support and
+synthetic UI/native tests do not establish live cross-device interoperability.

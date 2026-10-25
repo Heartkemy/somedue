@@ -16,6 +16,7 @@ export function Popover(props: {
   size?: "small" | "compact";
   iconOnly?: boolean;
   triggerClass?: string;
+  bodyClass?: string;
 }) {
   const id = createUniqueId(),
     [opened, setOpened] = createSignal(false);
@@ -33,9 +34,9 @@ export function Popover(props: {
     panel.style.left = `${Math.max(12, Math.min(r.left, innerWidth - width - 12))}px`;
     const below = innerHeight - r.bottom - 12,
       above = r.top - 12;
-    const down = below >= Math.min(panel.scrollHeight, 360) || below >= above;
-    panel.style.maxHeight = `${Math.max(120, Math.min(480, down ? below : above))}px`;
-    panel.style.top = `${down ? r.bottom + 6 : Math.max(12, r.top - panel.offsetHeight - 6)}px`;
+    panel.style.maxHeight = `${innerHeight - 24}px`;
+    const down = below >= panel.offsetHeight || below >= above;
+    panel.style.top = `${Math.max(12, Math.min(down ? r.bottom + 6 : r.top - panel.offsetHeight - 6, innerHeight - panel.offsetHeight - 12))}px`;
   };
   const open = () => {
     panel.showPopover();
@@ -88,7 +89,9 @@ export function Popover(props: {
           }
         }}
       >
-        <div class="control-popover-body grid min-w-0 gap-2 p-2.5 has-[>.ui-menu]:gap-0 has-[>.ui-menu]:p-2">
+        <div
+          class={`control-popover-body grid min-w-0 gap-2 p-2.5 has-[>.ui-menu]:gap-0 has-[>.ui-menu]:p-2 ${props.bodyClass || ""}`}
+        >
           {props.children(close)}
         </div>
       </div>

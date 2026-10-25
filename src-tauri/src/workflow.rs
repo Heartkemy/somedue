@@ -229,9 +229,20 @@ pub(crate) fn mutate(
 ) -> Result<Workspace, String> {
     let mut changes = store::prepare(changes)?;
     crate::recurrence::normalize_creation(&workspace.snapshot.entities, &mut changes)?;
+    crate::recurrence::completion_changes(&workspace.snapshot.entities, &mut changes)?;
     for (id, event) in changes.as_object_mut().ok_or("Invalid changes")? {
         let old = workspace.snapshot.entities.get(id);
         let p = event["p"].as_object().ok_or("Invalid fields")?;
+        if old.is_some_and(|item| !item.props["rr"].is_null())
+            && p.get("ss")
+                .and_then(Value::as_i64)
+                .is_some_and(|status| status != 0)
+        {
+            return Err(
+                "Repeating templates cannot be completed; complete their current copy instead."
+                    .into(),
+            );
+        }
         let stops_series = old.is_some_and(|e| {
             (e.props.get("rr").is_some_and(|v| !v.is_null())
                 && (p.get("rr") == Some(&Value::Null)
@@ -268,6 +279,23 @@ pub(crate) fn mutate(
             base,
             status: "queued".into(),
         });
+    }
+    Ok(next)
+}
+
+pub(crate) fn materialize(
+    workspace: &Workspace,
+    today: i64,
+    cloud_account: bool,
+) -> Result<Workspace, String> {
+    let mut next = workspace.clone();
+    // Bound catch-up after a long absence; later loads continue from the saved next date.
+    for _ in 0..32 {
+        let changes = crate::recurrence::due_changes(&next.snapshot.entities, today);
+        if changes.as_object().is_none_or(|map| map.is_empty()) {
+            break;
+        }
+        next = mutate(&next, changes, false, cloud_account)?;
     }
     Ok(next)
 }

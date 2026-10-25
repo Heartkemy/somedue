@@ -1,8 +1,24 @@
 import { For, Show } from "solid-js";
-import { FileText, Flag, ListChecks, Repeat2 } from "lucide-solid";
+import {
+  Archive,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  Flag,
+  Inbox,
+  Layers,
+  ListChecks,
+  Moon,
+  RotateCw,
+  Star,
+  Tag,
+  Trash2,
+} from "lucide-solid";
 import { Pill } from "./ui";
 import {
   isProject,
+  isTemplate,
   noteText,
   projectProgressPath,
   projectStats,
@@ -11,6 +27,68 @@ import {
   today,
   type Entity,
 } from "./model";
+import { Dynamic } from "solid-js/web";
+
+export function ListIcon(props: { name: string; size?: number }) {
+  const icons = {
+    Inbox,
+    Today: StarIcon,
+    Upcoming: CalendarDays,
+    Anytime: Layers,
+    Someday: Archive,
+    Logbook: BookOpen,
+    Trash: Trash2,
+    "This Evening": Moon,
+  };
+  const colors: Record<string, string> = {
+    Today: "text-accent",
+    Upcoming: "text-upcoming",
+    Anytime: "text-anytime",
+    Someday: "text-someday",
+    "This Evening": "text-muted",
+  };
+  return (
+    <Dynamic
+      component={icons[props.name as keyof typeof icons] || Inbox}
+      size={props.size || 16}
+      class={colors[props.name] || "text-quiet"}
+    />
+  );
+}
+
+function StarIcon(props: Record<string, any>) {
+  return <Star {...props} fill="currentColor" />;
+}
+
+export function EntityIcon(props: { item: Entity; all: Entity[] }) {
+  return (
+    <Show when={!props.item.kind.startsWith("Area")} fallback={<AreaIcon />}>
+      <Show
+        when={!isProject(props.item)}
+        fallback={
+          <Show
+            when={!props.item.props.ss}
+            fallback={<CheckCircle2 size={16} class="shrink-0 text-project" />}
+          >
+            <ProjectProgress project={props.item} all={props.all} />
+          </Show>
+        }
+      >
+        <Show
+          when={!isTemplate(props.item)}
+          fallback={<RotateCw size={16} class="shrink-0 text-upcoming" />}
+        >
+          <Show
+            when={!props.item.kind.startsWith("Tag")}
+            fallback={<Tag size={16} class="shrink-0 text-muted" />}
+          >
+            <CheckCircle2 size={16} class="shrink-0 text-muted" />
+          </Show>
+        </Show>
+      </Show>
+    </Show>
+  );
+}
 
 export const isSomeday = (item: Entity) =>
   item.props.st === 2 && !(item.props.sr || item.props.tir);
@@ -88,13 +166,19 @@ export function TaskMetadata(props: { item: Entity; all: Entity[] }) {
             <ListChecks size={15} />
           </span>
         </Show>
-        <Show when={refs(props.item, "rt").length}>
+        <Show
+          when={
+            refs(props.item, "rt").length ||
+            isTemplate(props.item) ||
+            props.item.props.rp
+          }
+        >
           <span title="Repeating">
-            <Repeat2 size={14} />
+            <RotateCw size={14} />
           </span>
         </Show>
         <Show when={isProject(props.item)}>
-          <span class="project-task-count text-xs">
+          <span class="project-task-count rounded border border-current px-1 text-xs leading-4 text-muted tabular-nums">
             {props.item.props.ss
               ? projectStats(props.item, props.all).total
               : projectStats(props.item, props.all).remaining}

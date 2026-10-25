@@ -37,13 +37,15 @@ test("pointer focus stays quiet; keyboard focus, scroll indicators and sidebar c
   const focus = page.getByRole("button", { name: "List options", exact: true });
   await expect(focus).toBeFocused();
   await expect(focus).not.toHaveCSS("box-shadow", "none");
-  await page.getByRole("button", { name: "Hide sidebar", exact: true }).click();
+  const grip = page.getByRole("separator", { name: "Sidebar width" });
+  await grip.click();
   await expect(page.locator(".sidebar")).toHaveCount(0);
-  await page.getByRole("button", { name: "Show sidebar", exact: true }).click();
+  await grip.click();
   await expect(page.locator(".sidebar")).toBeVisible();
-  await page.getByRole("separator", { name: "Sidebar width" }).dblclick();
+  await grip.focus();
+  await page.keyboard.press("Enter");
   await expect(page.locator(".sidebar")).toHaveCount(0);
-  await page.getByRole("button", { name: "Show sidebar", exact: true }).click();
+  await page.keyboard.press("Enter");
   const primary = await page
     .locator(".footer-actions > button, .footer-actions > .footer-schedule")
     .evaluateAll((els) =>
@@ -53,7 +55,7 @@ test("pointer focus stays quiet; keyboard focus, scroll indicators and sidebar c
       }),
     );
   expect(primary).toHaveLength(4);
-  expect(primary[1] - primary[0]).toBe(76);
+  expect(primary[1] - primary[0]).toBe(73);
   expect(primary[1] - primary[0]).toBe(primary[2] - primary[1]);
   expect(primary[2] - primary[1]).toBe(primary[3] - primary[2]);
   await page.evaluate(() => {

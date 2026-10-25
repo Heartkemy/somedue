@@ -20,7 +20,15 @@ export const lists = [
   "Logbook",
   "Trash",
 ] as const;
-export const title = (e: Entity) => e.props.tt || "Untitled";
+export const title = (e: Entity) =>
+  e.props.tt ||
+  (e.kind.startsWith("Task")
+    ? e.props.tp === 1
+      ? "New Project"
+      : e.props.tp === 2
+        ? "New Heading"
+        : "New To-Do"
+    : "Untitled");
 export const isTask = (e: Entity) => e.kind.startsWith("Task");
 export const isProject = (e: Entity) => isTask(e) && e.props.tp === 1;
 export const isHeading = (e: Entity) => isTask(e) && e.props.tp === 2;
@@ -116,8 +124,11 @@ export function visible(
   const now = today();
   const rows = all
     .filter((e) => {
-      if (!isTask(e) || isTemplate(e)) return false;
+      if (!isTask(e)) return false;
       if (tag && !effectiveTags(e, all).has(tag)) return false;
+      if (!query && list === "Trash") return inTrash(e, all);
+      if (isTemplate(e) && !["Upcoming", "Repeating", "Trash"].includes(list))
+        return false;
       if (query)
         return query.startsWith("#")
           ? [...effectiveTags(e, all)].some((id) =>
@@ -130,7 +141,6 @@ export function visible(
           : `${title(e)} ${noteText(e)}`
               .toLowerCase()
               .includes(query.toLowerCase());
-      if (list === "Trash") return inTrash(e, all);
       if (list === "Logbook")
         return !!e.props.ss && !inTrash(e, all) && !isHeading(e);
       const scoped = !lists.includes(list as any);
@@ -157,10 +167,7 @@ export function visible(
             ((start && start <= now) || (e.props.dd && e.props.dd <= now))
           );
         case "Upcoming":
-          return (
-            !isHeading(e) &&
-            ((start && start > now) || (e.props.dd && e.props.dd > now))
-          );
+          return !isHeading(e) && !e.props.icp && !!upcomingDay(e);
         case "Anytime":
           return (
             !isHeading(e) &&
@@ -170,7 +177,7 @@ export function visible(
         case "Someday":
           return !isHeading(e) && e.props.st === 2 && !start;
         case "Repeating":
-          return !!e.props.rt?.length;
+          return isTemplate(e) || !!e.props.rt?.length;
         case "Deadlines":
           return !!e.props.dd;
         default:
@@ -192,15 +199,22 @@ export function visible(
           ? scheduleBucket(a) - scheduleBucket(b)
           : 0) ||
         (list === "Upcoming"
-          ? (a.props.sr || a.props.dd || 0) - (b.props.sr || b.props.dd || 0)
-          : list === "Logbook"
-            ? (b.props.sp || 0) - (a.props.sp || 0)
-            : (list === "Today" ? (a.props.sb || 0) - (b.props.sb || 0) : 0) ||
-              (list === "Today"
-                ? (a.props.ti ?? a.props.ix ?? 0) -
-                  (b.props.ti ?? b.props.ix ?? 0)
-                : (a.props.ix || 0) - (b.props.ix || 0)) ||
-              a.id.localeCompare(b.id)),
+          ? upcomingDay(a) - upcomingDay(b)
+          : list === "Trash"
+            ? (b.props.md || b.props.cd || 0) -
+                (a.props.md || a.props.cd || 0) ||
+              (a.props.ix || 0) - (b.props.ix || 0) ||
+              a.id.localeCompare(b.id)
+            : list === "Logbook"
+              ? (b.props.sp || 0) - (a.props.sp || 0)
+              : (list === "Today"
+                  ? (a.props.sb || 0) - (b.props.sb || 0)
+                  : 0) ||
+                (list === "Today"
+                  ? (a.props.ti ?? a.props.ix ?? 0) -
+                    (b.props.ti ?? b.props.ix ?? 0)
+                  : (a.props.ix || 0) - (b.props.ix || 0)) ||
+                a.id.localeCompare(b.id)),
     );
   const project = all.find((e) => e.id === list && isProject(e));
   if (project && !query) {
@@ -228,6 +242,71 @@ export function visible(
       ...rows.filter((e) => !!e.props.ss),
     ];
   return rows;
+}
+export function upcomingDay(item: Entity) {
+  const days = [item.props.sr || item.props.tir, item.props.dd].filter(
+    (value) => value && value > today(),
+  );
+  return days.length ? Math.min(...days) : 0;
+}
+
+export function taskContainer(item: Entity, all: Entity[]): Entity | undefined {
+  const heading = all.find((e) => refs(item, "agr").includes(e.id));
+  return all.find((e) =>
+    [
+      ...refs(item, "pr"),
+      ...(heading ? refs(heading, "pr") : []),
+      ...refs(item, "ar"),
+    ].includes(e.id),
+  );
+}
+
+export type ListSection = {
+  id: string;
+  label: string;
+  rows: Entity[];
+  container?: Entity;
+  day?: number;
+};
+export function listSections(
+  rows: Entity[],
+  all: Entity[],
+  list: string,
+  calendar = true,
+): ListSection[] {
+  if (list === "Upcoming") {
+    const dates = new Set(rows.map(upcomingDay).filter(Boolean));
+    if (calendar)
+      for (let offset = 1; offset <= 30; offset++)
+        dates.add(today() + offset * 86400);
+    return [...dates]
+      .sort((a, b) => a - b)
+      .map((day) => ({
+        id: String(day),
+        label: "",
+        day,
+        rows: rows.filter((item) => upcomingDay(item) === day),
+      }));
+  }
+  if (list === "Anytime") {
+    const groups = new Map<string, ListSection>();
+    for (const item of rows.filter((item) => !isProject(item))) {
+      const parent = taskContainer(item, all);
+      const id = parent?.id || "no-project";
+      if (!groups.has(id))
+        groups.set(id, {
+          id,
+          label: parent ? title(parent) : "No Project",
+          container: parent,
+          rows: [],
+        });
+      groups.get(id)!.rows.push(item);
+    }
+    return [...groups.values()].sort(
+      (a, b) => (a.container?.props.ix || 0) - (b.container?.props.ix || 0),
+    );
+  }
+  return [{ id: list, label: "", rows }];
 }
 export const later = (e: Entity) =>
   (e.props.st === 2 && !(e.props.sr || e.props.tir)) ||

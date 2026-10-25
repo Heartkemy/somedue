@@ -103,9 +103,9 @@ for (const width of [1120, 760])
       }));
       expect(after.check).toBe(before.check);
       expect(after.title).toBe(before.title);
-      expect(Math.abs(after.top - before.top)).toBeLessThanOrEqual(2);
+      expect(after.top - before.top).toBeGreaterThanOrEqual(12);
       expect(after.neighbor).toBe(before.neighbor);
-      expect(after.left).toBeLessThan(after.list);
+      expect(after.left).toBe(after.list);
       const notes = page.getByRole("textbox", { name: "Notes", exact: true });
       await notes.focus();
       await expect(notes).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -203,7 +203,7 @@ for (const width of [1120, 760])
         row: row.getBoundingClientRect().right,
         deadline: row.querySelector(".deadline")!.getBoundingClientRect().right,
       }));
-      expect(right.deadline).toBe(right.row);
+      expect(right.row - right.deadline).toBe(12);
       const calendar = page.locator("#item-a .row-schedule");
       await page.locator("h1").hover();
       await expect(calendar).toHaveCSS("opacity", "0");

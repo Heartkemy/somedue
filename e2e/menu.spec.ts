@@ -28,12 +28,14 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
   await page.getByRole("button", { name: "Sync now", exact: true }).click();
   await page.locator(".project-nav").click();
   await page.locator("#item-h").click();
-  const save = page.getByRole("button", { name: "Save heading" }),
-    trigger = page.getByRole("button", {
-      name: "Heading actions",
-      exact: true,
-    });
-  for (const button of [save, trigger]) {
+  await expect(page.getByRole("button", { name: "Save heading" })).toHaveCount(
+    0,
+  );
+  const trigger = page.getByRole("button", {
+    name: "Heading actions",
+    exact: true,
+  });
+  for (const button of [trigger]) {
     const box = (await button.boundingBox())!;
     expect(box.width).toBe(28);
     expect(box.height).toBe(28);
@@ -41,7 +43,10 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
   await trigger.click();
   const menu = page.locator(".control-popover:popover-open .ui-menu:visible");
   await expect(menu).toHaveAttribute("role", "menu");
-  await expect(menu.getByRole("menuitem")).toHaveCount(2);
+  await expect(menu.getByRole("menuitem")).toHaveCount(4);
+  await expect(menu.getByRole("menuitem", { name: "Cancel edit" })).toHaveCount(
+    0,
+  );
   await expect(menu.getByRole("menuitem").last()).toHaveCSS(
     "background-color",
     "rgba(0, 0, 0, 0)",
@@ -51,7 +56,7 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
     "400",
   );
   await page.keyboard.press("ArrowDown");
-  await expect(menu.getByRole("menuitem").last()).toBeFocused();
+  await expect(menu.getByRole("menuitem").nth(1)).toBeFocused();
   await page.screenshot({
     path: info.outputPath("shared-heading-menu.png"),
     animations: "disabled",
@@ -61,7 +66,17 @@ test("heading and task actions use the same quiet menu and icon-button geometry"
   await expect(
     page.getByRole("textbox", { name: "Heading title" }),
   ).toHaveValue("Heading");
-  await page.keyboard.press("Escape");
+  await page
+    .getByRole("textbox", { name: "Heading title" })
+    .fill("Renamed heading");
+  await page.locator("h1").click();
+  await expect(page.locator("#item-h .task-title")).toHaveText(
+    "Renamed heading",
+  );
+  await expect(page.locator("#item-h")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
   await page.locator("#item-t .task-title").click();
   await page
     .getByRole("button", { name: "To-do actions", exact: true })

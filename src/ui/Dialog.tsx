@@ -6,6 +6,7 @@ export function Dialog(props: {
   close: () => void;
   children: JSX.Element;
   wide?: boolean;
+  compact?: boolean;
 }) {
   const feedback = useContext(FeedbackContext);
   let el!: HTMLDialogElement;
@@ -31,6 +32,8 @@ export function Dialog(props: {
         wide: props.wide,
         "w-190": props.wide,
         "w-110": !props.wide,
+        "p-3": props.compact,
+        "w-80": props.compact,
       }}
       aria-label={props.title}
       onCancel={(e) => {
@@ -50,26 +53,28 @@ export function Dialog(props: {
         }
       }}
     >
-      <div class="dialog-header mb-5 flex shrink-0 items-center justify-between gap-4">
-        <h2 class="min-w-0 font-sans text-2xl leading-tight font-semibold tracking-tight wrap-anywhere">
-          {props.title}
-        </h2>
-        <IconButton
-          size="small"
-          aria-label="Close dialog"
-          onClick={props.close}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="m4 4 8 8m0-8-8 8"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-          </svg>
-        </IconButton>
-      </div>
+      <Show when={!props.compact}>
+        <div class="dialog-header mb-5 flex shrink-0 items-center justify-between gap-4">
+          <h2 class="min-w-0 font-sans text-2xl leading-tight font-semibold tracking-tight wrap-anywhere">
+            {props.title}
+          </h2>
+          <IconButton
+            size="small"
+            aria-label="Close dialog"
+            onClick={props.close}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="m4 4 8 8m0-8-8 8"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+          </IconButton>
+        </div>
+      </Show>
       <div class="dialog-body -m-1.5 min-h-0 overflow-auto overscroll-contain p-1.5">
         <Show when={feedback()}>
           <p

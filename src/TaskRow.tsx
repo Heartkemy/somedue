@@ -1,9 +1,11 @@
 import { Show, type JSX } from "solid-js";
+import { RotateCw } from "lucide-solid";
 import { Button, CheckButton } from "./ui";
 import {
   container,
   isHeading,
   isProject,
+  isTemplate,
   later,
   title,
   type Entity,
@@ -40,7 +42,7 @@ export default function TaskRow(props: {
       role="listitem"
       aria-current={props.selected ? "true" : undefined}
       tabindex="0"
-      class="task-row group/task relative grid min-h-9 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 rounded-lg px-0 py-1 outline-none transition-colors hover:bg-hover compact:min-h-8 [&.selected]:bg-mint/10 [&.logged]:grid-cols-[--spacing(7)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-5.5 [&.heading]:mb-1.5 [&.heading]:flex [&.heading]:p-0 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-0 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
+      class="task-row group/task relative grid min-h-10 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-1.5 outline-none transition-colors hover:bg-hover compact:min-h-9 [&.selected]:bg-mint/10 [&.selected:has(+.selected)]:rounded-b-none [&.selected+.selected]:rounded-t-none [&.logged]:grid-cols-[--spacing(7)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-6 [&.heading]:mb-2 [&.heading]:flex [&.heading]:bg-transparent [&.heading]:py-2 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-0 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
       classList={{
         selected: props.selected,
         completed: props.item.props.ss === 3,
@@ -84,31 +86,47 @@ export default function TaskRow(props: {
     >
       <Show when={!isHeading(props.item)}>
         <Show
-          when={isProject(props.item) && !props.item.props.ss}
+          when={!isTemplate(props.item)}
           fallback={
-            <CheckButton
-              checked={!!props.item.props.ss}
-              canceled={props.item.props.ss === 2}
-              dashed={isSomeday(props.item)}
-              aria-label={`${props.item.props.ss ? "Reopen" : "Complete"} ${title(props.item)}`}
+            <RotateCw
+              size={16}
+              class="justify-self-center text-upcoming"
+              aria-label="Repeating template"
+            />
+          }
+        >
+          <Show
+            when={isProject(props.item) && !props.item.props.ss}
+            fallback={
+              <CheckButton
+                checked={!!props.item.props.ss}
+                canceled={props.item.props.ss === 2}
+                dashed={isSomeday(props.item)}
+                class={
+                  isProject(props.item)
+                    ? "text-project hover:bg-project/10"
+                    : undefined
+                }
+                aria-label={`${props.item.props.ss ? "Reopen" : "Complete"} ${title(props.item)}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.complete(e.altKey);
+                }}
+              />
+            }
+          >
+            <Button
+              variant="bare"
+              class="task-check project grid size-4 min-h-4 place-items-center justify-self-center rounded-full p-0"
+              aria-label={`Complete ${title(props.item)}`}
               onClick={(e) => {
                 e.stopPropagation();
                 props.complete(e.altKey);
               }}
-            />
-          }
-        >
-          <Button
-            variant="bare"
-            class="task-check project grid size-4 min-h-4 place-items-center justify-self-center rounded-full p-0"
-            aria-label={`Complete ${title(props.item)}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              props.complete(e.altKey);
-            }}
-          >
-            <ProjectProgress project={props.item} all={props.all} />
-          </Button>
+            >
+              <ProjectProgress project={props.item} all={props.all} />
+            </Button>
+          </Show>
         </Show>
       </Show>
       <Show when={props.item.props.ss}>
@@ -133,7 +151,7 @@ export default function TaskRow(props: {
               aria-label="Due today"
             />
           </Show>
-          <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">
+          <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:text-base group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">
             {props.name || title(props.item)}
           </span>
           <TaskMetadata item={props.item} all={props.all} />
@@ -147,7 +165,13 @@ export default function TaskRow(props: {
           </span>
         </Show>
       </div>
-      <Show when={!props.item.props.ss && !isHeading(props.item)}>
+      <Show
+        when={
+          !props.item.props.ss &&
+          !isHeading(props.item) &&
+          !isTemplate(props.item)
+        }
+      >
         <div
           data-row-control
           class="row-schedule absolute top-0 -left-8 flex h-9 w-7 items-center justify-center opacity-0 transition-opacity group-hover/task:opacity-100 group-focus-within/task:opacity-100 [@media(hover:none)]:opacity-100"

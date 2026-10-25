@@ -8,7 +8,7 @@ import {
   Folder,
   Info,
   MinusCircle,
-  Repeat2,
+  RotateCw,
   Share2,
   Tag,
   Trash2,
@@ -141,7 +141,7 @@ export default function TaskMenu(props: {
       <MenuDivider />
       <Show when={!props.multiple}>
         <MenuItem onClick={() => act("repeat")}>
-          <Repeat2 size={16} />
+          <RotateCw size={16} />
           Repeat…
         </MenuItem>
         <MenuItem onClick={() => act("info")}>

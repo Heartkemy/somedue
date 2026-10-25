@@ -147,7 +147,7 @@ for (const width of [1120, 760])
       await page.getByRole("button", { name: "Move to", exact: true }).click();
       await page
         .locator(".editor-move-panel")
-        .getByRole("button", { name: "Work", exact: true })
+        .getByRole("option", { name: "Work", exact: true })
         .click();
       await page
         .getByRole("button", { name: "Add checklist item", exact: true })

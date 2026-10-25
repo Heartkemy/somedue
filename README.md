@@ -29,9 +29,10 @@ endorsed by Cultured Code, the makers of Things.
 ## Current limitations
 
 Somedue does not yet implement everything Things can do. Advanced repeating-task
-rules, calendar and Apple Reminders import, full multi-selection, multiple main
-windows, and native automation are incomplete. Future copies of repeating tasks
-require the original Things app on a connected device. Reminders created in
+rules, calendar and Apple Reminders import, multiple main windows, and native
+automation are incomplete. Simple daily, weekly, monthly, yearly and
+after-completion rules create copies locally. Advanced imported rules, repeating
+projects and newer opaque repeaters still require Things. Reminders created in
 Somedue are local and do not sync to other devices.
 
 Only macOS is supported. Things Cloud access uses an unofficial protocol, and the

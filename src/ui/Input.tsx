@@ -16,7 +16,7 @@ export function Input(
         inputClasses,
         "min-h-10",
         local.variant === "plain" &&
-          "bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:[box-shadow:none]",
+          "bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:[box-shadow:none]",
         local.class,
       )}
     />
@@ -63,7 +63,7 @@ export function Textarea(
         inputClasses,
         local.autosize ? "resize-none" : "resize-y",
         local.variant === "plain" &&
-          "bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:[box-shadow:none]",
+          "bg-transparent hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:[box-shadow:none]",
         local.class,
       )}
     />

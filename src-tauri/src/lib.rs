@@ -23,6 +23,25 @@ fn save(a: &mut App, w: Workspace) -> Result<(), String> {
     a.workspace = w;
     Ok(())
 }
+fn calendar_day() -> i64 {
+    chrono::Local::now()
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc()
+        .timestamp()
+}
+fn materialize(a: &mut App) -> Result<(), String> {
+    let today = calendar_day();
+    if recurrence::due_changes(&a.workspace.snapshot.entities, today)
+        .as_object()
+        .is_some_and(|map| !map.is_empty())
+    {
+        let next = workflow::materialize(&a.workspace, today, a.account != "local")?;
+        save(a, next)?;
+    }
+    Ok(())
+}
 fn credentials(account: &str) -> Result<(String, String), String> {
     let v: Value = serde_json::from_str(&keychain::get(account)?)
         .map_err(|_| "Saved credentials could not be read. Reconnect in Settings.")?;
@@ -33,7 +52,16 @@ fn credentials(account: &str) -> Result<(String, String), String> {
 }
 #[tauri::command]
 async fn load(state: State<'_, Shared>) -> Result<Value, String> {
-    let a = state.0.lock().map_err(|_| "Workspace is unavailable")?;
+    let mut a = state.0.lock().map_err(|_| "Workspace is unavailable")?;
+    materialize(&mut a)?;
+    Ok(view(&a))
+}
+#[tauri::command]
+async fn repeat_copy(id: String, state: State<'_, Shared>) -> Result<Value, String> {
+    let mut a = state.0.lock().map_err(|_| "Workspace is unavailable")?;
+    let changes = recurrence::copy_changes(&a.workspace.snapshot.entities, &id, calendar_day())?;
+    let next = workflow::mutate(&a.workspace, changes, false, a.account != "local")?;
+    save(&mut a, next)?;
     Ok(view(&a))
 }
 #[tauri::command]
@@ -171,8 +199,9 @@ async fn mutate(changes: Value, confirm: bool, state: State<'_, Shared>) -> Resu
 async fn sync(state: State<'_, Shared>) -> Result<Value, String> {
     let _connection = state.1.lock().await;
     let (email, workspace) = {
-        let a = state.0.lock().map_err(|_| "Workspace is unavailable")?;
+        let mut a = state.0.lock().map_err(|_| "Workspace is unavailable")?;
         if a.account == "local" {
+            materialize(&mut a)?;
             return Ok(view(&a));
         }
         (a.account.clone(), a.workspace.clone())
@@ -203,7 +232,8 @@ async fn sync_workspace<R: workflow::Remote>(
         Ok(())
     })
     .await?;
-    let a = shared.0.lock().map_err(|_| "Workspace is unavailable")?;
+    let mut a = shared.0.lock().map_err(|_| "Workspace is unavailable")?;
+    materialize(&mut a)?;
     Ok(view(&a))
 }
 #[tauri::command]
@@ -353,6 +383,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             load,
+            repeat_copy,
             preferences,
             connect,
             disconnect,

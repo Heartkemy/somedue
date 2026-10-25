@@ -69,6 +69,14 @@ export default function SettingsPage(props: {
 
   const [newTag, setNewTag] = createSignal(""),
     [shortcut, setShortcut] = createSignal(pref("quickShortcut", ""));
+  const sections: Record<string, string> = {
+    General: "Capture, sync & Quick Entry",
+    Appearance: "Theme, spacing & motion",
+    "Things Cloud": "Account, sync & recovery",
+    Tags: "Organize your to-dos",
+    Keyboard: "Shortcuts & navigation",
+    About: "Somedue on this computer",
+  };
   async function preference(key: string, value: any) {
     await run(async () => {
       const preferences = { ...state().preferences, [key]: value };
@@ -94,14 +102,23 @@ export default function SettingsPage(props: {
       class="settings-panel min-h-0 flex-1 overflow-auto overscroll-contain px-11 pt-7 pb-12 max-lg:px-7"
       aria-labelledby="settings-title"
     >
-      <header class="settings-page-header mb-8 grid grid-cols-[--spacing(44)_minmax(0,1fr)] items-center gap-8 max-lg:grid-cols-1 max-lg:gap-4">
+      <nav
+        aria-label="Breadcrumb"
+        class="settings-breadcrumb mb-7 flex items-center gap-3 text-xs text-quiet"
+      >
+        <span class="size-1.5 rounded-full bg-accent" />
+        <span class="tracking-widest">Somedue</span>
+        <span aria-hidden="true">/</span>
+        <span>Settings</span>
+      </nav>
+      <header class="settings-page-header mb-8 grid grid-cols-[--spacing(48)_minmax(0,1fr)] items-center gap-8 max-lg:grid-cols-1 max-lg:gap-4">
         <Button
           variant="quiet"
-          class="settings-back justify-self-start px-0 font-normal"
+          class="settings-back max-w-full justify-self-start bg-hover px-4 font-medium text-xs"
           onClick={props.close}
         >
           <ArrowLeft size={16} />
-          Back to {props.backLabel}
+          <span class="truncate">Back to {props.backLabel}</span>
         </Button>
         <h1
           id="settings-title"
@@ -112,10 +129,10 @@ export default function SettingsPage(props: {
           Settings
         </h1>
       </header>
-      <div class="settings-layout grid min-h-0 grid-cols-[--spacing(44)_minmax(0,1fr)] items-start gap-8 max-lg:grid-cols-1 max-lg:gap-6">
+      <div class="settings-layout grid min-h-0 grid-cols-[--spacing(48)_minmax(0,1fr)] items-start gap-8 max-lg:grid-cols-1 max-lg:gap-6">
         <nav
           aria-label="Settings categories"
-          class="settings-navigation sticky top-0 flex flex-col gap-1 border-r border-quiet/15 bg-bg pr-4 max-lg:z-1 max-lg:flex-row max-lg:gap-3 max-lg:overflow-x-auto max-lg:border-r-0 max-lg:border-b max-lg:pr-0 max-lg:pb-2 [&>button]:min-h-10 [&>button]:justify-start [&>button]:rounded-lg [&>button]:px-3 [&>button]:py-2 [&>button]:text-left [&>button]:text-sm [&>button]:font-normal [&>button]:text-muted [&>button.active]:bg-hover [&>button.active]:text-ink"
+          class="settings-navigation sticky top-0 flex flex-col gap-2 border-r border-quiet/15 bg-bg pr-4 max-lg:z-1 max-lg:flex-row max-lg:gap-3 max-lg:overflow-x-auto max-lg:border-r-0 max-lg:border-b max-lg:pr-0 max-lg:pb-2 [&>button]:relative [&>button]:min-h-12 [&>button]:justify-start [&>button]:rounded-none [&>button]:bg-transparent [&>button]:px-0 [&>button]:py-3 [&>button]:text-left [&>button]:text-sm [&>button]:font-normal [&>button]:text-muted [&>button.active]:text-ink [&>button.active]:after:absolute [&>button.active]:after:bottom-0 [&>button.active]:after:left-0 [&>button.active]:after:h-0.5 [&>button.active]:after:w-5 [&>button.active]:after:bg-accent [&>button.active]:after:content-['']"
         >
           <For
             each={[
@@ -130,6 +147,7 @@ export default function SettingsPage(props: {
             {(tab) => (
               <Button
                 variant="bare"
+                aria-label={tab}
                 classList={{ active: settingsTab() === tab }}
                 aria-current={settingsTab() === tab ? "page" : undefined}
                 onClick={() => {
@@ -137,12 +155,17 @@ export default function SettingsPage(props: {
                   panel.scrollTop = 0;
                 }}
               >
-                {tab}
+                <span class="min-w-0">
+                  {tab}
+                  <small class="mt-1 block text-xs font-normal leading-relaxed text-quiet max-lg:hidden">
+                    {sections[tab]}
+                  </small>
+                </span>
               </Button>
             )}
           </For>
         </nav>
-        <div class="settings-content min-w-0 pb-8 [&_p]:mb-4 [&_p]:max-w-prose [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted [&_h3]:mb-3 [&_h3]:font-sans [&_h3]:text-2xl [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:text-base [&_h4]:font-medium">
+        <div class="settings-content min-w-0 pb-8 [&_p]:mb-4 [&_p]:max-w-prose [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted [&_h3]:mb-3 [&_h3]:font-sans [&_h3]:text-3xl [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:text-lg [&_h4]:font-medium">
           <Show when={settingsTab() === "General"}>
             <SectionHeading>General</SectionHeading>
             <p class="muted text-muted">

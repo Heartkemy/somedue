@@ -7,7 +7,7 @@ export function ActionBar(props: JSX.HTMLAttributes<HTMLDivElement>) {
     <div
       {...rest}
       class={twMerge(
-        "grid grid-cols-4 items-center justify-items-center gap-3 [&>*]:w-16 [&>button]:w-7",
+        "grid w-72 grid-cols-4 items-center justify-items-center gap-1 [&>*]:flex [&>*]:w-16 [&>*]:justify-center [&>button]:h-7 [&>button]:min-h-7 [&>button]:rounded-full [&_.popover-control>button]:w-16 [&_.popover-control>button]:rounded-full",
         local.class,
       )}
     />

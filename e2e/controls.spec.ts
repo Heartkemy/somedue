@@ -182,10 +182,19 @@ for (const viewport of [
             h: r.height,
             radius: getComputedStyle(e).borderRadius,
             compact: e.getAttribute("data-size") === "compact",
+            toolbar:
+              !!e.closest(".footer-actions,.editor-footer-actions") &&
+              !e.parentElement?.matches(".footer-schedule"),
           };
         }),
       );
       for (const i of icons) {
+        if (i.toolbar) {
+          expect(i.w).toBe(64);
+          expect(i.h).toBe(28);
+          expect(parseFloat(i.radius)).toBeGreaterThanOrEqual(14);
+          continue;
+        }
         expect(i.w).toBe(i.h);
         if (i.compact) expect(i.radius).toBe("6px");
         else expect(parseFloat(i.radius)).toBeGreaterThanOrEqual(i.w / 2);

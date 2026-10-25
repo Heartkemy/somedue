@@ -171,7 +171,28 @@ CARGO_TARGET_DIR='/Users/notme/Library/Caches/Somedue/cargo-target' cargo test -
 
 `workflow.rs` is the actual service called by native `connect`, `mutate`, and `sync` commands. Its regression tests cover frontend-minimal create payloads, pre-POST offline retryability, immutable conflict before-images, durable sending checkpoints, uncertain/crashed requests never resent, reconciliation after a successful POST followed by disk failure, disk failure before POST preventing network writes, individually checkpointed sequential drafts, and repeated conflict reviews preserving unrelated remote notes. Reconnect uses a non-secret one-way history fingerprint to prevent replaying drafts into a reset account history while the actual capability remains in Keychain.
 
-`recurrence.rs` normalizes initial template schedule to the next occurrence while leaving the visible first instance on its requested day. Tests cover month-end and leap-year dates. It supports only the simple scheduled daily, single-weekday weekly, monthly and yearly creation variants established by the reference. It rejects unsupported recurrence variants instead of approximating them. Recurring completion changes status only: **this client does not autonomously materialize subsequent copies**. The original Things client must do so. After-completion recurrence creation is rejected because the writer reference does not establish its wire representation. Stopping recurrence requires confirmation, trashes the hidden template, and clears the visible instance's rt/rr/icsd. These are material fidelity limitations; successful unit tests do not establish full recurrence parity or live native interoperability.
+`recurrence.rs` normalizes the initial template to its next occurrence while
+leaving the first visible copy on its requested day. Simple daily, single-weekday
+weekly, monthly and yearly rules support explicit next-copy creation and automatic
+materialization on load/sync. Catch-up is bounded to 32 occurrences per series per
+load. Templates appear in Upcoming with a repeat icon instead of a completion
+control. End dates, paused/inactive parents and duplicate occurrence dates prevent
+additional copies. Checklist copies reset their completion state.
+
+After-completion rules use `tp: 1`, corroborated against the
+[writer implementation](https://github.com/mattydsmith/things-cloud-mcp/blob/main/server/write.go)
+and its [recurrence tests](https://github.com/mattydsmith/things-cloud-mcp/blob/main/server/write_repeat_test.go)
+on 2026-10-25. They wait for the active copy to complete, then schedule from that
+completion's local calendar day. This matches the documented
+[Things repeat-pattern behavior](https://culturedcode.com/things/support/articles/3743733/).
+Unit tests exercise this pipeline without contacting a live account.
+
+Unsupported imported rules and opaque `rp` repeaters remain unchanged; autonomous
+copying of repeating projects is still unsupported. Future-rule edits target the
+template; ordinary copy edits affect that copy alone. Stopping requires explicit
+confirmation and retains existing copies. Recurring reminder times are local,
+account-scoped preferences, not invented recurrence wire fields. These checks do
+not establish full native interoperability or live cross-device compatibility.
 
 ## Installed-model compatibility correction, 2026-10-23
 

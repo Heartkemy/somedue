@@ -31,14 +31,13 @@ import {
   ChevronRight,
   Check,
   Flag,
-  Repeat2,
+  RotateCw,
   MoreHorizontal,
   RefreshCw,
   Moon,
   Folder,
   X,
   Box,
-  PanelLeft,
   ArrowRight,
   ListChecks,
   FileText,
@@ -51,6 +50,8 @@ import {
   isDueToday,
   isSomeday,
   ProjectProgress as ProjectProgressIcon,
+  ListIcon,
+  EntityIcon,
 } from "./TaskIndicators";
 import { selectListItems } from "./list-selection";
 import {
@@ -101,10 +102,15 @@ import {
   orderBefore,
   scheduleBucket,
   effectiveTags,
+  inTrash,
+  listSections,
 } from "./model";
 import Markdown from "./Markdown";
 import { installMotion } from "./motion";
 import { createEditorSaves, type EditorSession } from "./editor-saves";
+import DestinationPicker from "./DestinationPicker";
+import RepeatRuleDialog, { type RepeatOptions } from "./RepeatRuleDialog";
+import { ruleDates, ruleSummary, simpleRule } from "./recurrence";
 type CheckRow = { id: string; kind: string; title: string; done: boolean };
 type EditorDraft =
   | { heading: true; name: string }
@@ -117,10 +123,11 @@ type EditorDraft =
       deadline: string;
       reminder: string;
       tags: string[];
-      repeat: string;
+      repeatRule: Props | null;
+      repeatNext: string;
+      repeatOptions: RepeatOptions;
       repeatOpen: boolean;
       repeatId: string;
-      interval: number;
       checks: CheckRow[];
       status: number;
       destination: string;
@@ -148,6 +155,9 @@ export default function App() {
     >(null),
     [infoItem, setInfoItem] = createSignal<Entity | null>(null),
     [newTasks, setNewTasks] = createSignal<string[]>([]),
+    [newToday, setNewToday] = createSignal<string[]>([]),
+    [upcomingCalendar, setUpcomingCalendar] = createSignal(true),
+    [expandedGroups, setExpandedGroups] = createSignal<string[]>([]),
     [editing, setEditing] = createSignal(""),
     [draft, setDraft] = createSignal<Entity | null>(null),
     [query, setQuery] = createSignal(""),
@@ -174,6 +184,7 @@ export default function App() {
     [findOpen, setFindOpen] = createSignal(false),
     [findQuery, setFindQuery] = createSignal(""),
     [findIndex, setFindIndex] = createSignal(0),
+    [recentItems, setRecentItems] = createSignal<string[]>(["Today", "Inbox"]),
     [editorActions, setEditorActions] = createSignal<{
       move: () => void;
       more: () => void;
@@ -221,12 +232,34 @@ export default function App() {
   }
   async function completeSelection(cancel = false) {
     const reopen = selectedItems().every((item) => !!item.props.ss);
-    await patchSelection({
-      ss: reopen ? 0 : cancel ? 2 : 3,
-      sp: reopen ? null : Date.now() / 1000,
-    });
+    const changes = Object.assign(
+      {},
+      ...selectedItems()
+        .filter((item) => !isTemplate(item))
+        .map((item) =>
+          event(item, {
+            ss: reopen ? 0 : cancel ? 2 : 3,
+            sp: reopen ? null : Date.now() / 1000,
+          }),
+        ),
+    );
+    if (Object.keys(changes).length) await run(() => mutate(changes));
   }
   async function removeSelection() {
+    if (selectedItems().some(isTemplate)) {
+      const changes = Object.assign(
+        {},
+        ...selectedItems().map((item) => event(item, { tr: true })),
+      );
+      ask(
+        "Move these repeating schedules to Trash? Future copies will stop; existing copies stay in your lists.",
+        async () => {
+          await mutate(changes, true);
+          setSelected("");
+        },
+      );
+      return;
+    }
     await patchSelection({ tr: true });
     setSelected("");
   }
@@ -278,7 +311,11 @@ export default function App() {
     setState(next);
   }
   const visibleNewTasks = () =>
-    items().filter((item) => newTasks().includes(item.id));
+    items().filter(
+      (item) =>
+        newTasks().includes(item.id) ||
+        (list() === "Today" && newToday().includes(item.id)),
+    );
   function taskAction(action: TaskAction) {
     const item = chosen();
     if (!item) return;
@@ -308,10 +345,18 @@ export default function App() {
       return;
     }
     if (["complete", "cancel", "reopen"].includes(action)) {
-      void patchSelection({
-        ss: action === "complete" ? 3 : action === "cancel" ? 2 : 0,
-        sp: action === "reopen" ? null : Date.now() / 1000,
-      });
+      const changes = Object.assign(
+        {},
+        ...selectedItems()
+          .filter((item) => !isTemplate(item))
+          .map((item) =>
+            event(item, {
+              ss: action === "complete" ? 3 : action === "cancel" ? 2 : 0,
+              sp: action === "reopen" ? null : Date.now() / 1000,
+            }),
+          ),
+      );
+      if (Object.keys(changes).length) void run(() => mutate(changes));
       return;
     }
     if (action === "info") {
@@ -352,6 +397,16 @@ export default function App() {
   function setState(input: State | ((previous: State) => State)) {
     setRawState((previous) => {
       const next = typeof input === "function" ? input(previous) : input;
+      if (!loading() && next.account === previous.account) {
+        const seen = new Set(
+          visible(previous.entities, "Today").map((item) => item.id),
+        );
+        const added = visible(next.entities, "Today")
+          .filter((item) => !seen.has(item.id))
+          .map((item) => item.id);
+        if (added.length)
+          setNewToday((ids) => [...new Set([...ids, ...added])]);
+      }
       const previousById = new Map(
         previous.entities.map((entity) => [entity.id, entity]),
       );
@@ -468,6 +523,22 @@ export default function App() {
   async function checkReminders() {
     if (checkingReminders || editing() || settings()) return;
     const reminders = { ...pref("reminders", {}) };
+    const delivered = new Set<string>(pref("repeatRemindersDelivered", []));
+    for (const item of all().filter(
+      (item) => isTask(item) && !isTemplate(item) && active(item, all()),
+    )) {
+      const time = pref("repeatOptions", {})[
+        `${state().account}:${refs(item, "rt")[0]}`
+      ]?.reminderTime;
+      const key = `${state().account}:${item.id}`;
+      if (
+        time &&
+        !delivered.has(key) &&
+        !reminders[key] &&
+        (item.props.tir || item.props.sr)
+      )
+        reminders[key] = `${date(item.props.tir || item.props.sr)}T${time}`;
+    }
     const due = Object.entries(reminders).filter(
       ([key, value]: [string, any]) =>
         key.startsWith(`${state().account}:`) &&
@@ -479,8 +550,15 @@ export default function App() {
       const tasks = due
         .map(([key]) => all().find((e) => `${state().account}:${e.id}` === key))
         .filter((e): e is Entity => !!e && !e.props.ss && !trashed(e));
-      for (const [key] of due) delete reminders[key];
-      const preferences = { ...state().preferences, reminders };
+      for (const [key] of due) {
+        delete reminders[key];
+        delivered.add(key);
+      }
+      const preferences = {
+        ...state().preferences,
+        reminders,
+        repeatRemindersDelivered: [...delivered],
+      };
       await call("preferences", { value: preferences });
       setState((s) => ({ ...s, preferences }));
       if (tasks.length) {
@@ -546,6 +624,14 @@ export default function App() {
       ).values(),
     ];
   });
+  const sections = createMemo(() =>
+    listSections(
+      items(),
+      all(),
+      query() ? "Search" : list(),
+      upcomingCalendar(),
+    ),
+  );
   const pref = (key: string, fallback: any) =>
     state().preferences[key] ?? fallback;
   createEffect(
@@ -706,6 +792,9 @@ export default function App() {
       return;
     }
     setSettings(false);
+    setRecentItems((ids) =>
+      [id, ...ids.filter((value) => value !== id)].slice(0, 8),
+    );
     setList(id);
     setQuery("");
     setTag("");
@@ -720,6 +809,9 @@ export default function App() {
       return;
     }
     setSelected(e.id);
+    setRecentItems((ids) =>
+      [e.id, ...ids.filter((value) => value !== e.id)].slice(0, 8),
+    );
     if (isProject(e)) {
       navigate(e.id);
     } else setEditing(e.id);
@@ -729,6 +821,7 @@ export default function App() {
     setMenu(false);
   }
   async function complete(e: Entity, cancel = false) {
+    if (isTemplate(e)) return;
     if (editing() && editing() !== e.id)
       throw Error("Save or close the open to-do first.");
     const changes = event(e, {
@@ -743,6 +836,16 @@ export default function App() {
     });
   }
   async function remove(e: Entity) {
+    if (isTemplate(e)) {
+      ask(
+        "Move this repeating schedule to Trash? Future copies will stop; existing copies stay in your lists.",
+        async () => {
+          await mutate(event(e, { tr: true }), true);
+          discardEditor();
+        },
+      );
+      return;
+    }
     const session = editorSaves.drafts.get(e.id);
     await editorSaves.enqueue(async () => {
       if (all().some((saved) => saved.id === e.id))
@@ -1130,6 +1233,8 @@ export default function App() {
     const interval = setInterval(() => {
       if (pref("autoSync", true) && state().account !== "local" && !editing())
         void refresh();
+      else if (native() && state().account === "local" && !editing())
+        void run(async () => applyIncoming(await call("load")));
     }, 60000);
     const reminderInterval = setInterval(() => void checkReminders(), 15000);
     onCleanup(() => {
@@ -1192,17 +1297,22 @@ export default function App() {
   }
   function resizeSidebar(e: PointerEvent) {
     const startX = e.clientX,
-      width = Number(pref("sidebarWidth", sidebarWidth()));
+      width = sidebar() ? sidebarWidth() : 0;
+    let moved = false;
     const handle = e.currentTarget as HTMLElement;
     handle.setPointerCapture(e.pointerId);
-    const update = (ev: PointerEvent) =>
-      setSidebarWidth(
-        Math.max(180, Math.min(380, width + ev.clientX - startX)),
-      );
+    const update = (ev: PointerEvent) => {
+      if (Math.abs(ev.clientX - startX) < 3 && !moved) return;
+      moved = true;
+      const value = width + ev.clientX - startX;
+      setSidebar(value >= 130);
+      if (value >= 130) setSidebarWidth(Math.max(180, Math.min(380, value)));
+    };
     const end = () => {
       handle.removeEventListener("pointermove", update);
       handle.removeEventListener("pointerup", end);
       handle.removeEventListener("pointercancel", end);
+      if (!moved) setSidebar((open) => !open);
       void persistSidebarWidth(sidebarWidth());
     };
     handle.addEventListener("pointermove", update);
@@ -1212,7 +1322,7 @@ export default function App() {
   return (
     <FeedbackContext.Provider value={error}>
       <div
-        class="app grid h-dvh grid-rows-[--spacing(14)_minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
+        class="app relative grid h-dvh grid-rows-[--spacing(14)_minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
         classList={{
           "grid-cols-1": !sidebar(),
           "grid-cols-[var(--sidebar-width)_minmax(0,1fr)]": sidebar(),
@@ -1231,49 +1341,51 @@ export default function App() {
             "padding-right": `calc(100% - ${sidebar() ? sidebarWidth() : 136}px + 16px)`,
           }}
           data-tauri-drag-region
-        >
-          <IconButton
-            size="compact"
-            variant="quiet"
-            aria-label={sidebar() ? "Hide sidebar" : "Show sidebar"}
-            aria-expanded={sidebar()}
-            title="Toggle sidebar (⌘ /)"
-            onClick={() => setSidebar((v) => !v)}
-          >
-            <PanelLeft size={17} />
-          </IconButton>
-        </div>
+        ></div>
+        <div
+          class="sidebar-resizer absolute top-1/2 z-30 grid h-16 w-6 -translate-y-1/2 cursor-col-resize touch-none place-items-center rounded-full outline-none after:h-12 after:w-2 after:rounded-full after:bg-quiet/35 hover:after:bg-quiet/65 focus-visible:after:bg-quiet"
+          style={{ left: `${sidebar() ? sidebarWidth() - 8 : 0}px` }}
+          role="separator"
+          aria-label="Sidebar width"
+          aria-orientation="vertical"
+          aria-valuemin={0}
+          aria-valuemax={380}
+          aria-valuenow={sidebar() ? sidebarWidth() : 0}
+          aria-valuetext={
+            sidebar()
+              ? `${sidebarWidth()} pixels; click to collapse`
+              : "Collapsed; click to show sidebar"
+          }
+          title="Click to toggle sidebar · Drag to resize (⌘ /)"
+          tabindex="0"
+          onPointerDown={resizeSidebar}
+          onKeyDown={(e) => {
+            if (["Enter", " ", "Home", "End"].includes(e.key)) {
+              e.preventDefault();
+              setSidebar((open) =>
+                e.key === "Home" ? false : e.key === "End" ? true : !open,
+              );
+            }
+            if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+              e.preventDefault();
+              setSidebar(true);
+              const width = Math.max(
+                180,
+                Math.min(
+                  380,
+                  sidebarWidth() + (e.key === "ArrowRight" ? 10 : -10),
+                ),
+              );
+              setSidebarWidth(width);
+              void persistSidebarWidth(width);
+            }
+          }}
+        />
         <Show when={sidebar()}>
           <aside
             class="sidebar relative col-start-1 row-span-full row-start-1 flex min-h-0 min-w-0 flex-col bg-linear-to-b from-sidebar-start to-sidebar-end pt-14"
             inert={connectionOpen()}
           >
-            <div
-              class="sidebar-resizer absolute inset-y-0 -right-1 z-5 w-2 cursor-col-resize touch-none focus-visible:ring-0 focus-visible:ring-offset-0 after:absolute after:top-[45%] after:right-0.5 after:h-6 after:w-0.5 after:rounded after:bg-quiet after:opacity-0 after:content-[''] hover:after:opacity-65 focus-visible:after:opacity-65 focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-mint"
-              role="separator"
-              aria-label="Sidebar width"
-              aria-orientation="vertical"
-              aria-valuemin={180}
-              aria-valuemax={380}
-              aria-valuenow={sidebarWidth()}
-              tabindex="0"
-              onPointerDown={resizeSidebar}
-              onDblClick={() => setSidebar(false)}
-              onKeyDown={(e) => {
-                if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
-                  e.preventDefault();
-                  const width = Math.max(
-                    180,
-                    Math.min(
-                      380,
-                      sidebarWidth() + (e.key === "ArrowRight" ? 10 : -10),
-                    ),
-                  );
-                  setSidebarWidth(width);
-                  void persistSidebarWidth(width);
-                }
-              }}
-            />
             <div class="sidebar-body min-h-0 flex-1 overflow-auto overscroll-contain px-4 pb-4 [scrollbar-gutter:stable]">
               <nav aria-label="Lists">
                 <For each={lists}>
@@ -1282,6 +1394,7 @@ export default function App() {
                     return (
                       <Button
                         variant="bare"
+                        aria-label={name}
                         class="nav-item sidebar-item [&:nth-child(2)]:mt-3.5 [&:nth-child(6)]:mt-3.5 grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink"
                         classList={{ active: list() === name && !query() }}
                         onClick={() => navigate(name)}
@@ -1647,7 +1760,7 @@ export default function App() {
                     setMenu(false);
                   }}
                 >
-                  <Repeat2 size={16} /> Repeating items
+                  <RotateCw size={16} /> Repeating items
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -1715,33 +1828,8 @@ export default function App() {
               class="list-page relative min-h-0 flex-1 overflow-auto scroll-smooth px-11 pt-7 pb-9 max-lg:px-7 max-lg:pb-8 data-[list=Logbook]:[&_.list-group-heading]:mt-6 data-[list=Logbook]:[&_.list-group-heading]:border-b data-[list=Logbook]:[&_.list-group-heading]:border-hover data-[list=Logbook]:[&_.list-group-heading]:pb-2.5 data-[list=Logbook]:[&_.list-group-heading]:text-sm data-[list=Logbook]:[&_.list-group-heading]:font-semibold data-[list=Logbook]:[&_.list-group-heading]:text-ink"
               data-list={list()}
             >
-              <Show when={visibleNewTasks().length}>
-                <div
-                  class="new-todos mb-7 flex items-center justify-between gap-4 rounded-lg bg-highlight/20 px-4 py-3 text-sm text-accent"
-                  role="status"
-                >
-                  <span>
-                    You have {visibleNewTasks().length} new to-do
-                    {visibleNewTasks().length === 1 ? "" : "s"}
-                  </span>
-                  <Button
-                    size="small"
-                    class="bg-highlight text-on-highlight hover:bg-highlight/90"
-                    onClick={() => {
-                      const ids = new Set(
-                        visibleNewTasks().map((item) => item.id),
-                      );
-                      setNewTasks((previous) =>
-                        previous.filter((id) => !ids.has(id)),
-                      );
-                    }}
-                  >
-                    OK
-                  </Button>
-                </div>
-              </Show>
               <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
-                <div class="heading-line flex items-baseline gap-3">
+                <div class="heading-line flex items-baseline gap-3 px-3">
                   <span class="page-symbol flex size-7 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
                     {list() === "Inbox" ? (
                       <Inbox />
@@ -1829,6 +1917,99 @@ export default function App() {
                   aria-hidden="true"
                 />
               </header>
+              <Show when={visibleNewTasks().length}>
+                <div
+                  class="new-todos mb-7 flex items-center justify-between gap-4 rounded-lg bg-highlight/20 px-4 py-3 text-sm text-accent"
+                  role="status"
+                >
+                  <span>
+                    You have {visibleNewTasks().length} new to-do
+                    {visibleNewTasks().length === 1 ? "" : "s"}
+                  </span>
+                  <Button
+                    size="small"
+                    class="bg-highlight text-on-highlight hover:bg-highlight/90"
+                    onClick={() => {
+                      const ids = new Set(
+                        visibleNewTasks().map((item) => item.id),
+                      );
+                      setNewTasks((previous) =>
+                        previous.filter((id) => !ids.has(id)),
+                      );
+                      setNewToday((previous) =>
+                        previous.filter((id) => !ids.has(id)),
+                      );
+                    }}
+                  >
+                    OK
+                  </Button>
+                </div>
+              </Show>
+              <Show when={list() === "Upcoming"}>
+                <div
+                  class="upcoming-switch mb-5 flex gap-1"
+                  role="group"
+                  aria-label="Upcoming view"
+                >
+                  <Button
+                    size="small"
+                    variant="quiet"
+                    aria-pressed={upcomingCalendar()}
+                    classList={{ "bg-selection": upcomingCalendar() }}
+                    onClick={() => setUpcomingCalendar(true)}
+                  >
+                    Calendar
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="quiet"
+                    aria-pressed={!upcomingCalendar()}
+                    classList={{ "bg-selection": !upcomingCalendar() }}
+                    onClick={() => setUpcomingCalendar(false)}
+                  >
+                    Scheduled only
+                  </Button>
+                </div>
+              </Show>
+              <Show when={list() === "Trash" && items().length}>
+                <Button
+                  size="small"
+                  variant="danger"
+                  class="mb-5"
+                  onClick={() =>
+                    ask(
+                      "Permanently delete everything in Trash? This cannot be undone.",
+                      async () => {
+                        const changes: Changes = {};
+                        for (const item of all().filter(
+                          (item) => isTask(item) && inTrash(item, all()),
+                        ))
+                          Object.assign(changes, deleteTree(item, all()));
+                        const deleted = new Set(Object.keys(changes));
+                        for (const copy of all().filter(
+                          (copy) =>
+                            !deleted.has(copy.id) &&
+                            refs(copy, "rt").some((id) => deleted.has(id)),
+                        ))
+                          Object.assign(
+                            changes,
+                            event(copy, {
+                              rt: refs(copy, "rt").filter(
+                                (id) => !deleted.has(id),
+                              ),
+                            }),
+                          );
+                        await mutate(changes, true, false);
+                        setUndo(null);
+                        setSelected("");
+                      },
+                    )
+                  }
+                >
+                  <Trash2 size={14} />
+                  Empty Trash
+                </Button>
+              </Show>
               <Show
                 when={!loading()}
                 fallback={
@@ -1839,7 +2020,10 @@ export default function App() {
                 }
               >
                 <Show
-                  when={items().length}
+                  when={
+                    items().length ||
+                    (list() === "Upcoming" && upcomingCalendar())
+                  }
                   fallback={
                     <div
                       class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
@@ -1872,157 +2056,280 @@ export default function App() {
                   }
                 >
                   <div class="task-list" role="list" aria-label="To-dos">
-                    <For each={items()}>
-                      {(item, index) => (
-                        <>
-                          <Show
-                            when={
-                              current() &&
-                              item.props.ss &&
-                              !items()[index() - 1]?.props.ss
-                            }
-                          >
-                            <ListVisibility />
-                          </Show>
-                          <Show
-                            when={
-                              group(item) &&
-                              group(item) !==
-                                group(
-                                  items()[index() - 1] || {
-                                    id: "",
-                                    kind: "",
-                                    props: {},
-                                  },
-                                )
-                            }
-                          >
-                            <div class="list-group-heading my-1 flex items-center gap-2 py-1 pt-2 text-xs leading-4 font-medium text-mint first:mt-0 first:pt-0">
-                              {group(item) === "This Evening" && (
-                                <Moon size={16} />
-                              )}
-                              <span>{group(item)}</span>
-                            </div>
-                          </Show>
-                          <Show
-                            when={editing() === item.id}
-                            fallback={
-                              <TaskRow
-                                item={item}
-                                all={all()}
-                                selected={selection().includes(item.id)}
-                                name={editorSaves.drafts
-                                  .get(item.id)
-                                  ?.read()
-                                  .name.trim()}
-                                showContainer={!current()}
-                                dropEdge={
-                                  dropTarget()?.id === item.id
-                                    ? dropTarget()!.after
-                                      ? "after"
-                                      : "before"
-                                    : undefined
-                                }
-                                focus={() => {
-                                  if (
-                                    !editing() &&
-                                    !selection().includes(item.id)
-                                  )
-                                    setSelected(item.id);
-                                }}
-                                open={(e) => {
-                                  if (Date.now() < suppressRowClickUntil)
-                                    return;
-                                  if (e.metaKey || e.ctrlKey || e.shiftKey)
-                                    selectItem(item, e);
-                                  else openItem(item);
-                                }}
-                                complete={(cancel) =>
-                                  void run(() => complete(item, cancel))
-                                }
-                                context={(e) => openTaskMenu(item, e)}
-                                dragStart={(e) => {
-                                  setDragging(item.id);
-                                  if (!selection().includes(item.id))
-                                    setSelected(item.id);
-                                  if (e.dataTransfer) {
-                                    e.dataTransfer.effectAllowed = "move";
-                                    e.dataTransfer.setData(
-                                      "text/plain",
-                                      item.id,
-                                    );
-                                  }
-                                }}
-                                dragEnd={() => {
-                                  setDragging("");
-                                  setDropTarget(null);
-                                  suppressRowClickUntil = Date.now() + 250;
-                                }}
-                                dragOver={(e) => {
-                                  e.preventDefault();
-                                  if (e.dataTransfer)
-                                    e.dataTransfer.dropEffect = "move";
-                                  const r =
-                                    e.currentTarget.getBoundingClientRect();
-                                  setDropTarget({
-                                    id: item.id,
-                                    after: e.clientY > r.y + r.height / 2,
-                                  });
-                                }}
-                                dragLeave={(e) => {
-                                  if (
-                                    !e.currentTarget.contains(
-                                      e.relatedTarget as Node,
-                                    )
-                                  )
-                                    setDropTarget(null);
-                                }}
-                                drop={(e) => rowDrop(e, item)}
-                                schedule={
-                                  <DatePicker
-                                    compact
-                                    iconOnly
-                                    kind="when"
-                                    reminder={
-                                      pref("reminders", {})[
-                                        state().account + ":" + item.id
-                                      ] || ""
-                                    }
-                                    changeReminder={(value) =>
-                                      void saveReminder(item, value)
-                                    }
-                                    value={date(
-                                      item.props.sr || item.props.tir,
-                                    )}
-                                    mode={
-                                      isSomeday(item)
-                                        ? "Someday"
-                                        : item.props.sr || item.props.tir
-                                          ? "Date"
-                                          : item.props.st
-                                            ? "Anytime"
-                                            : "Inbox"
-                                    }
-                                    change={(value, mode) =>
-                                      void patch(
-                                        item,
-                                        schedule(mode || "Date", value),
-                                      )
-                                    }
-                                  />
-                                }
-                              />
-                            }
-                          >
-                            <Show
-                              when={isHeading(item)}
-                              fallback={<Editor item={item} />}
-                            >
-                              <HeadingEditor item={item} />
+                    <For each={sections().map((section) => section.id)}>
+                      {(sectionId) => {
+                        const section = () =>
+                          sections().find(
+                            (section) => section.id === sectionId,
+                          ) || {
+                            id: sectionId,
+                            label: "",
+                            rows: [] as Entity[],
+                            day: undefined as number | undefined,
+                            container: undefined as Entity | undefined,
+                          };
+                        return (
+                          <>
+                            <Show when={section().day}>
+                              <div class="upcoming-day mt-6 mb-2 flex items-baseline gap-2 border-b border-hover pb-2 text-xs font-medium text-muted first:mt-0">
+                                <span class="text-2xl font-semibold leading-none text-ink tabular-nums">
+                                  {new Date(section().day! * 1000).getUTCDate()}
+                                </span>
+                                <span>
+                                  {section().day === today() + 86400
+                                    ? "Tomorrow"
+                                    : new Date(
+                                        section().day! * 1000,
+                                      ).toLocaleDateString("en", {
+                                        weekday: "long",
+                                        timeZone: "UTC",
+                                      })}
+                                </span>
+                                <span class="ml-auto text-quiet">
+                                  {new Date(
+                                    section().day! * 1000,
+                                  ).toLocaleDateString("en", {
+                                    month: "short",
+                                    timeZone: "UTC",
+                                  })}
+                                </span>
+                              </div>
+                              <Show when={!section().rows.length}>
+                                <div
+                                  class="min-h-8"
+                                  aria-label={`No to-dos on ${date(section().day)}`}
+                                />
+                              </Show>
                             </Show>
-                          </Show>
-                        </>
-                      )}
+                            <Show when={section().label}>
+                              <div class="anytime-group-heading mt-6 mb-2 grid grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 border-b border-hover px-3 pb-2 text-sm font-semibold first:mt-0">
+                                <span class="grid place-items-center">
+                                  <Show
+                                    when={section().container}
+                                    fallback={
+                                      <Layers size={16} class="text-anytime" />
+                                    }
+                                  >
+                                    <EntityIcon
+                                      item={section().container!}
+                                      all={all()}
+                                    />
+                                  </Show>
+                                </span>
+                                <Show
+                                  when={section().container}
+                                  fallback={<span>{section().label}</span>}
+                                >
+                                  <Button
+                                    variant="bare"
+                                    class="min-w-0 truncate text-left"
+                                    onClick={() => navigate(section().id)}
+                                  >
+                                    {section().label}
+                                  </Button>
+                                </Show>
+                              </div>
+                            </Show>
+                            <For
+                              each={
+                                list() === "Anytime" &&
+                                !expandedGroups().includes(section().id)
+                                  ? section().rows.slice(0, 3)
+                                  : section().rows
+                              }
+                            >
+                              {(item, index) => (
+                                <>
+                                  <Show
+                                    when={
+                                      current() &&
+                                      item.props.ss &&
+                                      !items()[index() - 1]?.props.ss
+                                    }
+                                  >
+                                    <ListVisibility />
+                                  </Show>
+                                  <Show
+                                    when={
+                                      list() !== "Upcoming" &&
+                                      group(item) &&
+                                      group(item) !==
+                                        group(
+                                          items()[index() - 1] || {
+                                            id: "",
+                                            kind: "",
+                                            props: {},
+                                          },
+                                        )
+                                    }
+                                  >
+                                    <div class="list-group-heading mt-7 mb-2 flex items-center gap-2 border-b border-hover px-3 pb-2 text-sm leading-5 font-semibold text-ink first:mt-0">
+                                      {group(item) === "This Evening" && (
+                                        <Moon
+                                          size={16}
+                                          class="text-muted"
+                                          fill="currentColor"
+                                        />
+                                      )}
+                                      <span>{group(item)}</span>
+                                    </div>
+                                  </Show>
+                                  <Show
+                                    when={editing() === item.id}
+                                    fallback={
+                                      <TaskRow
+                                        item={item}
+                                        all={all()}
+                                        selected={selection().includes(item.id)}
+                                        name={editorSaves.drafts
+                                          .get(item.id)
+                                          ?.read()
+                                          .name.trim()}
+                                        showContainer={!current()}
+                                        dropEdge={
+                                          dropTarget()?.id === item.id
+                                            ? dropTarget()!.after
+                                              ? "after"
+                                              : "before"
+                                            : undefined
+                                        }
+                                        focus={() => {
+                                          if (
+                                            !editing() &&
+                                            !selection().includes(item.id)
+                                          )
+                                            setSelected(item.id);
+                                        }}
+                                        open={(e) => {
+                                          if (
+                                            Date.now() < suppressRowClickUntil
+                                          )
+                                            return;
+                                          if (
+                                            e.metaKey ||
+                                            e.ctrlKey ||
+                                            e.shiftKey
+                                          )
+                                            selectItem(item, e);
+                                          else openItem(item);
+                                        }}
+                                        complete={(cancel) =>
+                                          void run(() => complete(item, cancel))
+                                        }
+                                        context={(e) => openTaskMenu(item, e)}
+                                        dragStart={(e) => {
+                                          setDragging(item.id);
+                                          if (!selection().includes(item.id))
+                                            setSelected(item.id);
+                                          if (e.dataTransfer) {
+                                            e.dataTransfer.effectAllowed =
+                                              "move";
+                                            e.dataTransfer.setData(
+                                              "text/plain",
+                                              item.id,
+                                            );
+                                          }
+                                        }}
+                                        dragEnd={() => {
+                                          setDragging("");
+                                          setDropTarget(null);
+                                          suppressRowClickUntil =
+                                            Date.now() + 250;
+                                        }}
+                                        dragOver={(e) => {
+                                          e.preventDefault();
+                                          if (e.dataTransfer)
+                                            e.dataTransfer.dropEffect = "move";
+                                          const r =
+                                            e.currentTarget.getBoundingClientRect();
+                                          setDropTarget({
+                                            id: item.id,
+                                            after:
+                                              e.clientY > r.y + r.height / 2,
+                                          });
+                                        }}
+                                        dragLeave={(e) => {
+                                          if (
+                                            !e.currentTarget.contains(
+                                              e.relatedTarget as Node,
+                                            )
+                                          )
+                                            setDropTarget(null);
+                                        }}
+                                        drop={(e) => rowDrop(e, item)}
+                                        schedule={
+                                          <DatePicker
+                                            compact
+                                            iconOnly
+                                            kind="when"
+                                            reminder={
+                                              pref("reminders", {})[
+                                                state().account + ":" + item.id
+                                              ] || ""
+                                            }
+                                            changeReminder={(value) =>
+                                              void saveReminder(item, value)
+                                            }
+                                            value={date(
+                                              item.props.sr || item.props.tir,
+                                            )}
+                                            mode={
+                                              isSomeday(item)
+                                                ? "Someday"
+                                                : item.props.sr ||
+                                                    item.props.tir
+                                                  ? "Date"
+                                                  : item.props.st
+                                                    ? "Anytime"
+                                                    : "Inbox"
+                                            }
+                                            change={(value, mode) =>
+                                              void patch(
+                                                item,
+                                                schedule(mode || "Date", value),
+                                              )
+                                            }
+                                          />
+                                        }
+                                      />
+                                    }
+                                  >
+                                    <Show
+                                      when={isHeading(item)}
+                                      fallback={<Editor item={item} />}
+                                    >
+                                      <HeadingEditor item={item} />
+                                    </Show>
+                                  </Show>
+                                </>
+                              )}
+                            </For>
+                            <Show
+                              when={
+                                list() === "Anytime" &&
+                                section().rows.length > 3
+                              }
+                            >
+                              <Button
+                                size="compact"
+                                variant="quiet"
+                                class="ml-13 mt-1 text-quiet"
+                                onClick={() =>
+                                  setExpandedGroups((ids) =>
+                                    ids.includes(section().id)
+                                      ? ids.filter((id) => id !== section().id)
+                                      : [...ids, section().id],
+                                  )
+                                }
+                              >
+                                {expandedGroups().includes(section().id)
+                                  ? "Show less"
+                                  : `Show ${section().rows.length - 3} more`}
+                              </Button>
+                            </Show>
+                          </>
+                        );
+                      }}
                     </For>
                   </div>
                 </Show>
@@ -2237,42 +2544,41 @@ export default function App() {
           <CreateDialog />
         </Show>
         <Show when={moving() && chosen()}>
-          <Dialog title="Move to…" close={() => setMoving(false)}>
-            <div class="destination-list flex max-h-[50dvh] flex-col overflow-auto [&>button]:justify-start [&>button]:p-3 [&>button]:text-muted [&_small]:ml-auto [&_small]:text-quiet">
-              <Button
-                onClick={() =>
-                  void run(async () => {
-                    await patchSelection((item) => move(item, null));
-                    setMoving(false);
-                  })
-                }
-              >
-                <Inbox size={17} />
-                Inbox
-              </Button>
-              <For
-                each={[
-                  ...areas(),
-                  ...projects(),
-                  ...all().filter((e) => isHeading(e) && active(e, all())),
-                ].filter((x) => x.id !== chosen()?.id)}
-              >
-                {(dest) => (
-                  <Button
-                    onClick={() =>
-                      void run(async () => {
-                        await patchSelection((item) => move(item, dest));
-                        setMoving(false);
-                      })
-                    }
-                  >
-                    <Folder size={17} />
-                    {title(dest)}
-                    <small>{container(dest, all())}</small>
-                  </Button>
-                )}
-              </For>
-            </div>
+          <Dialog title="Move to…" compact close={() => setMoving(false)}>
+            <DestinationPicker
+              all={all()}
+              item={chosen()!}
+              selected={
+                refs(chosen()!, "agr")[0] ||
+                refs(chosen()!, "pr")[0] ||
+                refs(chosen()!, "ar")[0]
+              }
+              choose={(dest, inbox) =>
+                void run(async () => {
+                  const changes: Changes = {};
+                  for (const item of selectedItems()) {
+                    Object.assign(
+                      changes,
+                      event(item, {
+                        ...move(item, dest),
+                        ...(!dest
+                          ? inbox
+                            ? schedule("Inbox")
+                            : { st: item.props.st || 1 }
+                          : {}),
+                      }),
+                    );
+                    if (isHeading(item) && dest && isProject(dest))
+                      for (const child of all().filter((child) =>
+                        refs(child, "agr").includes(item.id),
+                      ))
+                        Object.assign(changes, event(child, { pr: [dest.id] }));
+                  }
+                  await mutate(changes);
+                  setMoving(false);
+                })
+              }
+            />
           </Dialog>
         </Show>
         <Show when={connectionOpen()}>
@@ -2381,7 +2687,7 @@ export default function App() {
       visible(all(), list(), "", "", true).filter((item) => !!item.props.ss)
         .length;
     return (
-      <div class="list-visibility mt-7 flex flex-col items-start gap-2 border-t border-hover pt-3 [&>button]:min-h-7 [&>button]:text-xs [&>button]:text-muted">
+      <div class="list-visibility mt-7 flex flex-col items-start gap-2 border-t border-hover pt-3 pl-4.5 [&>button]:min-h-7 [&>button]:px-0 [&>button]:text-xs [&>button]:text-muted">
         <Button
           variant="quiet"
           aria-pressed={!showLater()}
@@ -2455,7 +2761,7 @@ export default function App() {
   function HeadingEditor(props: { item: Entity }) {
     const item = props.item;
     const [name, setName] = createSignal(
-      editorSaves.drafts.get(item.id)?.read().name ?? title(item),
+      editorSaves.drafts.get(item.id)?.read().name ?? item.props.tt ?? "",
     );
     const read = (): EditorDraft => ({ heading: true, name: name() });
     const session = editorSaves.retain(item, read);
@@ -2490,6 +2796,7 @@ export default function App() {
         if (editorSaves.unchanged(session, snapshot)) {
           batch(() => {
             if (currentEditor === session) setEditing("");
+            if (selected() === item.id) setSelected("");
             releaseEditor(session);
           });
         }
@@ -2504,7 +2811,16 @@ export default function App() {
       }
     });
     return (
-      <div class="heading inline-heading-editor mt-6 mb-2 flex min-h-8 items-center gap-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:font-semibold [&>input]:text-accent">
+      <div
+        class="heading inline-heading-editor mt-6 mb-2 flex min-h-12 items-center gap-2 rounded-xl bg-surface px-3 py-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:text-base [&>input]:font-semibold [&>input]:text-accent"
+        onFocusOut={(event) => {
+          if (
+            event.relatedTarget instanceof Node &&
+            !event.currentTarget.contains(event.relatedTarget)
+          )
+            void save();
+        }}
+      >
         <Input
           variant="plain"
           ref={input}
@@ -2519,18 +2835,10 @@ export default function App() {
             }
             if (e.key === "Escape") {
               e.stopPropagation();
-              discardEditor();
+              void save();
             }
           }}
         />
-        <IconButton
-          size="compact"
-          variant="quiet"
-          aria-label="Save heading"
-          onClick={() => void save()}
-        >
-          <Check size={16} />
-        </IconButton>
         <Popover
           size="compact"
           iconOnly
@@ -2542,18 +2850,68 @@ export default function App() {
               <MenuItem
                 onClick={() => {
                   close();
-                  discardEditor();
+                  void run(async () => {
+                    if (await save())
+                      await mutate(
+                        event(item, { ss: 3, sp: Date.now() / 1000 }),
+                      );
+                  });
                 }}
               >
-                <X size={16} /> Cancel edit
+                <Archive size={16} /> Archive
               </MenuItem>
               <MenuItem
                 onClick={() => {
                   close();
-                  void run(() => remove(props.item));
+                  void run(async () => {
+                    if (await save()) {
+                      setSelected(item.id);
+                      setMoving(true);
+                    }
+                  });
                 }}
               >
-                <Trash2 size={16} /> Move heading to Trash
+                <ArrowRight size={16} /> Move…
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  close();
+                  void run(async () => {
+                    if (await save()) {
+                      const parent = all().find((parent) =>
+                        refs(item, "pr").includes(parent.id),
+                      );
+                      const changes = event(item, {
+                        tp: 1,
+                        pr: [],
+                        agr: [],
+                        ar: parent ? refs(parent, "ar") : [],
+                        st: 1,
+                      });
+                      for (const child of all().filter((child) =>
+                        refs(child, "agr").includes(item.id),
+                      ))
+                        Object.assign(
+                          changes,
+                          event(child, { pr: [item.id], agr: [] }),
+                        );
+                      await mutate(changes);
+                    }
+                  });
+                }}
+              >
+                <Folder size={16} /> Convert to Project…
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  close();
+                  void run(async () => {
+                    if (!name().trim() || (await save()))
+                      await remove(props.item);
+                  });
+                }}
+              >
+                <Trash2 size={16} /> Delete
               </MenuItem>
             </Menu>
           )}
@@ -2565,9 +2923,13 @@ export default function App() {
     let input!: HTMLInputElement;
     const destinations = () =>
       [
-        ...lists.map((name) => ({ id: name, label: name })),
-        ...areas().map((a) => ({ id: a.id, label: title(a) })),
-        ...projects().map((p) => ({ id: p.id, label: title(p) })),
+        ...lists.map((name) => ({
+          id: name,
+          label: name,
+          entity: null as Entity | null,
+        })),
+        ...areas().map((a) => ({ id: a.id, label: title(a), entity: a })),
+        ...projects().map((p) => ({ id: p.id, label: title(p), entity: p })),
       ].filter((x) =>
         x.label.toLowerCase().includes(findQuery().toLowerCase()),
       );
@@ -2577,14 +2939,47 @@ export default function App() {
             .filter((e) => !isProject(e) && !isHeading(e))
             .slice(0, 40)
         : [];
-    const entries = () => [
-      ...destinations().map((d) => ({
-        id: d.id,
-        label: d.label,
-        item: null as Entity | null,
-      })),
-      ...results().map((item) => ({ id: item.id, label: title(item), item })),
-    ];
+    const entries = () =>
+      findQuery().trim()
+        ? [
+            ...destinations().map((d) => ({
+              id: d.id,
+              label: d.label,
+              entity: d.entity,
+              item: null as Entity | null,
+            })),
+            ...results().map((item) => ({
+              id: item.id,
+              label: title(item),
+              item,
+              entity: item,
+            })),
+          ]
+        : recentItems().flatMap((id) => {
+            const item = all().find((item) => item.id === id);
+            if (lists.includes(id as any))
+              return [
+                {
+                  id,
+                  label: id,
+                  item: null as Entity | null,
+                  entity: null as Entity | null,
+                },
+              ];
+            return item
+              ? [
+                  {
+                    id,
+                    label: title(item),
+                    item:
+                      isProject(item) || item.kind.startsWith("Area")
+                        ? null
+                        : item,
+                    entity: item,
+                  },
+                ]
+              : [];
+          });
     function choose(index: number) {
       const entry = entries()[index];
       if (!entry) return;
@@ -2619,7 +3014,7 @@ export default function App() {
     }
     onMount(() => input.focus());
     return (
-      <Dialog title="Quick Find" close={() => setFindOpen(false)}>
+      <Dialog title="Quick Find" compact close={() => setFindOpen(false)}>
         <div
           class="quick-find"
           onKeyDown={(e) => {
@@ -2644,9 +3039,11 @@ export default function App() {
             }
           }}
         >
-          <div class="find-input flex items-center gap-2.5 text-muted">
-            <Search size={18} />
+          <div class="find-input flex items-center gap-2 rounded-full bg-hover px-3 text-muted">
+            <Search size={15} />
             <Input
+              variant="plain"
+              class="min-h-8 px-0 py-0 text-sm"
               ref={input}
               aria-label="Quick Find query"
               role="combobox"
@@ -2656,7 +3053,7 @@ export default function App() {
               aria-activedescendant={
                 entries().length ? `find-result-${findIndex()}` : undefined
               }
-              placeholder="Find a list, to-do or #tag…"
+              placeholder="Quick Find"
               value={findQuery()}
               onInput={(e) => {
                 setFindQuery(e.currentTarget.value);
@@ -2664,9 +3061,14 @@ export default function App() {
               }}
             />
           </div>
+          <Show when={!findQuery().trim()}>
+            <h3 class="mt-4 mb-1 border-b border-hover px-1 pb-2 text-xs font-medium text-muted">
+              Recent
+            </h3>
+          </Show>
           <div
             id="find-results"
-            class="find-results -mx-1 my-3.5 max-h-[50dvh] overflow-auto p-1 [&>button]:min-h-10 [&>button]:w-full [&>button]:justify-start [&>button]:gap-2 [&>button]:rounded-lg [&>button]:px-2.5 [&>button]:py-1.5 [&>button]:text-left [&>button>span]:min-w-0 [&>button>span]:truncate [&>button>svg]:shrink-0 [&>button>svg]:text-accent [&_small]:ml-auto [&_small]:max-w-30 [&_small]:truncate [&_small]:text-muted [&_.find-active]:bg-selection"
+            class="find-results my-2 max-h-[50dvh] overflow-auto [&>button]:min-h-7 [&>button]:w-full [&>button]:justify-start [&>button]:gap-2 [&>button]:rounded-md [&>button]:px-2 [&>button]:py-1 [&>button]:text-left [&>button]:text-xs [&>button>span]:min-w-0 [&>button>span]:truncate [&>button>svg]:shrink-0 [&_small]:ml-auto [&_small]:max-w-24 [&_small]:truncate [&_small]:text-quiet [&_.find-active]:bg-selection"
             role="listbox"
             aria-label="Quick Find results"
           >
@@ -2675,16 +3077,32 @@ export default function App() {
                 <Button
                   variant="bare"
                   role="option"
+                  aria-label={entry.label}
                   id={`find-result-${i()}`}
                   aria-selected={findIndex() === i()}
                   classList={{ "find-active": findIndex() === i() }}
                   onPointerMove={() => setFindIndex(i())}
                   onClick={() => choose(i())}
                 >
-                  {entry.item ? <FileText size={16} /> : <Folder size={16} />}
+                  <Show
+                    when={entry.entity}
+                    fallback={<ListIcon name={entry.id} />}
+                  >
+                    <EntityIcon item={entry.entity!} all={all()} />
+                  </Show>
                   <span>{entry.label}</span>
                   <Show when={entry.item}>
                     <small>{container(entry.item!, all())}</small>
+                  </Show>
+                  <Show
+                    when={
+                      entry.id === "Inbox" && visible(all(), "Inbox").length
+                    }
+                  >
+                    <small>{visible(all(), "Inbox").length}</small>
+                  </Show>
+                  <Show when={!entry.item && entry.id === list()}>
+                    <Check size={14} class="ml-auto text-accent" />
                   </Show>
                 </Button>
               )}
@@ -2693,8 +3111,10 @@ export default function App() {
           <Show when={!entries().length}>
             <p class="muted text-muted">No matching lists or to-dos.</p>
           </Show>
-          <p class="find-hint pt-2 text-xs text-quiet">
-            ↑ ↓ to choose · Return to open · Escape to close
+          <p class="find-hint px-4 pt-4 pb-2 text-center text-xs leading-relaxed text-quiet">
+            Quickly switch lists, find to-dos
+            <br />
+            or search for tags…
           </p>
         </div>
       </Dialog>
@@ -2865,9 +3285,14 @@ export default function App() {
         restored?.tags ?? refs(item, "tg"),
       ),
       [tagBusy, setTagBusy] = createSignal(false),
-      [repeat, setRepeat] = createSignal(restored?.repeat ?? ""),
+      [repeatRule, setRepeatRule] = createSignal<Props | null>(
+        restored?.repeatRule ?? null,
+      ),
+      [repeatNext, setRepeatNext] = createSignal(restored?.repeatNext ?? ""),
+      [repeatOptions, setRepeatOptions] = createSignal<RepeatOptions>(
+        restored?.repeatOptions ?? {},
+      ),
       [repeatOpen, setRepeatOpen] = createSignal(restored?.repeatOpen ?? false),
-      [interval, setInterval] = createSignal(restored?.interval ?? 1),
       [saving, setSaving] = createSignal(false);
     const [checkRows, setCheckRows] = createStore<CheckRow[]>(
       restored?.checks ??
@@ -2894,7 +3319,10 @@ export default function App() {
           refs(item, "ar")[0] ||
           ""),
     );
-    const repeatId = restored?.repeatId || uuid();
+    const repeatId =
+      restored?.repeatId ||
+      (isTemplate(item) ? item.id : refs(item, "rt")[0]) ||
+      uuid();
     let conversion = restored?.convert ?? false;
     const read = (): Extract<EditorDraft, { heading: false }> => ({
       heading: false,
@@ -2905,10 +3333,11 @@ export default function App() {
       deadline: deadline(),
       reminder: reminder(),
       tags: [...selectedTags()],
-      repeat: repeat(),
+      repeatRule: repeatRule(),
+      repeatNext: repeatNext(),
+      repeatOptions: { ...repeatOptions() },
       repeatOpen: repeatOpen(),
       repeatId,
-      interval: interval(),
       checks: checks().map((check) => ({ ...check })),
       status: status(),
       destination: destination(),
@@ -2983,7 +3412,9 @@ export default function App() {
     );
     const recurring = () => {
       const saved = all().find((e) => e.id === item.id) || item;
-      return all().find((e) => e.id === refs(saved, "rt")[0]);
+      return isTemplate(saved)
+        ? saved
+        : all().find((e) => e.id === refs(saved, "rt")[0] && !trashed(e));
     };
     function handleAction(action: TaskAction) {
       if (["when", "tags", "deadline"].includes(action)) {
@@ -2996,8 +3427,13 @@ export default function App() {
         editor
           .querySelector<HTMLButtonElement>(".editor-move > button")
           ?.click();
-      else if (action === "repeat") setRepeatOpen(true);
-      else if (action === "info") setInfoItem(item);
+      else if (action === "repeat") {
+        if (item.props.rp)
+          setError(
+            "This task uses a newer imported repeating format. Edit its rule in Things; its original schedule is preserved.",
+          );
+        else setRepeatOpen(true);
+      } else if (action === "info") setInfoItem(item);
       else if (action === "convert") void save(true);
       else if (action === "delete") void run(() => remove(item));
       else if (action === "share") void shareTask(name(), notes());
@@ -3040,7 +3476,10 @@ export default function App() {
     ): Promise<boolean | undefined> | false {
       if (tagBusy()) return false;
       if (saving() && !handoff) return inFlight || false;
-      if (!name().trim()) {
+      if (
+        !name().trim() &&
+        (!all().some((saved) => saved.id === item.id) || item.props.tt?.trim())
+      ) {
         if (
           !all().some((saved) => saved.id === item.id) &&
           !notes().trim() &&
@@ -3061,14 +3500,6 @@ export default function App() {
       ) {
         discardEditor();
         return Promise.resolve(true);
-      }
-      if (
-        snapshot.repeat &&
-        recurring() &&
-        recurring()!.id !== snapshot.repeatId
-      ) {
-        setError("Stop the existing repetition before choosing a new rule.");
-        return false;
       }
       setSaving(true);
       const result = persistEditor(session, async () => {
@@ -3116,63 +3547,88 @@ export default function App() {
         for (const old of existingChecks)
           if (!snapshot.checks.some((c) => c.id === old.id))
             changes[old.id] = { e: old.kind, t: 2, p: {} };
-        if (snapshot.repeat) {
-          const existing = all().find((e) => e.id === refs(savedItem, "rt")[0]);
-          if (
-            existing &&
-            (existing.id !== snapshot.repeatId ||
-              existing.props.rr?.fu !== Number(snapshot.repeat) ||
-              existing.props.rr?.fa !== snapshot.interval)
-          )
+        if (snapshot.repeatRule) {
+          if (savedItem.props.rp)
             throw Error(
-              "Stop the existing repetition before choosing a new rule.",
+              "The original imported repeating schedule must be edited in Things.",
             );
-          if (!existing) {
-            const fu = Number(snapshot.repeat),
-              first = p.sr || savedItem.props.sr || today();
-            const templateId = snapshot.repeatId;
-            const d = new Date(first * 1000);
-            const details =
-              fu === 256
-                ? [{ wd: d.getUTCDay() }]
-                : fu === 8
-                  ? [{ dy: d.getUTCDate() - 1 }]
-                  : fu === 4
-                    ? [{ dy: d.getUTCDate() - 1, mo: d.getUTCMonth() }]
-                    : [{}];
-            const rr = {
-              fu,
-              fa: snapshot.interval,
-              of: details,
-              ia: first,
-              ed: 64092211200,
-              rc: 0,
-              rrv: 4,
-              tp: 0,
-              ts: 0,
+          const rule = snapshot.repeatRule;
+          const first = day(
+            snapshot.repeatNext || snapshot.start || date(today()),
+          );
+          const series = recurring();
+          if (series && !simpleRule(series.props.rr))
+            throw Error(
+              "This imported rule cannot be changed safely; the original rule is preserved.",
+            );
+          const waiting =
+            rule.tp === 1 &&
+            series &&
+            all().some(
+              (copy) =>
+                refs(copy, "rt").includes(series.id) &&
+                !copy.props.ss &&
+                !trashed(copy),
+            );
+          const ruleFields = {
+            rr: rule,
+            sr: waiting ? null : first,
+            tir: waiting ? null : first,
+            dd:
+              snapshot.repeatOptions.deadlineOffset === undefined
+                ? null
+                : first + snapshot.repeatOptions.deadlineOffset * 86400,
+          };
+          if (series) {
+            changes[series.id] ||= { e: series.kind, t: 1, p: {} };
+            Object.assign(changes[series.id].p, ruleFields);
+          } else {
+            changes[snapshot.repeatId] = {
+              e: "Task6",
+              t: 0,
+              p: {
+                ...savedItem.props,
+                ...fields(snapshot, savedItem),
+                ...ruleFields,
+                ss: 0,
+                sp: null,
+                tr: false,
+                rt: [],
+                icsd: first,
+                icp: false,
+              },
             };
-            const template = {
-              ...savedItem.props,
-              ...p,
-              ss: 0,
-              sp: null,
-              rr,
-              rt: [],
-              icsd: first,
-              icp: false,
-            };
-            changes[templateId] = { e: "Task6", t: 0, p: template };
             changes[item.id] ||= { e: item.kind, t: 1, p: {} };
-            changes[item.id].p = {
-              ...changes[item.id].p,
-              rt: [templateId],
+            Object.assign(changes[item.id].p, {
+              rt: [snapshot.repeatId],
               sr: first,
               tir: first,
               st: first > today() ? 2 : 1,
-            };
+            });
+            for (const check of snapshot.checks.filter((check) =>
+              check.title.trim(),
+            ))
+              Object.assign(
+                changes,
+                create(check.kind, {
+                  tt: check.title.trim(),
+                  ts: [snapshot.repeatId],
+                  ss: 0,
+                  ix: snapshot.checks.indexOf(check) * 1024,
+                }),
+              );
           }
         }
         if (Object.keys(changes).length) await mutate(changes, true);
+        if (snapshot.repeatRule) {
+          const repeatOptions = {
+            ...pref("repeatOptions", {}),
+            [`${state().account}:${snapshot.repeatId}`]: snapshot.repeatOptions,
+          };
+          const preferences = { ...state().preferences, repeatOptions };
+          await call("preferences", { value: preferences });
+          setState((state) => ({ ...state, preferences }));
+        }
         const reminderKey = `${state().account}:${item.id}`;
         if ((pref("reminders", {})[reminderKey] || "") !== snapshot.reminder) {
           const reminders = { ...pref("reminders", {}) };
@@ -3208,7 +3664,7 @@ export default function App() {
     });
     return (
       <div
-        class="task-editor relative -mx-4 mb-4 flex flex-col gap-2 rounded-xl bg-surface px-4 py-1 pb-3 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
+        class="task-editor relative mb-4 flex flex-col gap-2 rounded-xl bg-surface px-3 py-5 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
         data-instant={instant || undefined}
         ref={editor}
         role="group"
@@ -3251,13 +3707,24 @@ export default function App() {
         }}
       >
         <div class="editor-title grid min-h-7 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 [&_input]:min-h-7 [&_input]:h-7 [&_input]:rounded-none [&_input]:px-0 [&_input]:py-0 [&_input]:text-sm [&_input]:font-normal [&_input]:focus-visible:bg-transparent [&_input]:focus-visible:shadow-none">
-          <CheckButton
-            aria-label={status() ? "Reopen to-do" : "Complete to-do"}
-            checked={!!status()}
-            canceled={status() === 2}
-            dashed={mode() === "Someday"}
-            onClick={(e) => setStatus(status() ? 0 : e.altKey ? 2 : 3)}
-          />
+          <Show
+            when={!isTemplate(item)}
+            fallback={
+              <RotateCw
+                size={16}
+                class="justify-self-center text-upcoming"
+                aria-label="Repeating template"
+              />
+            }
+          >
+            <CheckButton
+              aria-label={status() ? "Reopen to-do" : "Complete to-do"}
+              checked={!!status()}
+              canceled={status() === 2}
+              dashed={mode() === "Someday"}
+              onClick={(e) => setStatus(status() ? 0 : e.altKey ? 2 : 3)}
+            />
+          </Show>
           <div class="flex min-w-0 items-center gap-2">
             <Show when={isDueToday(item)}>
               <span
@@ -3300,7 +3767,7 @@ export default function App() {
           <For each={checks()}>
             {(c) => (
               <div
-                class="check-row flex min-w-0 items-center gap-2.5 px-0.5 [&>input:not([type=checkbox])]:min-h-9 [&>input:not([type=checkbox])]:flex-1 [&>input:not([type=checkbox])]:rounded-lg [&>input:not([type=checkbox])]:px-2.5 [&>input:not([type=checkbox])]:py-2 [&>input:not([type=checkbox])]:text-sm [&>input:checked+input]:text-quiet [&>input:checked+input]:line-through"
+                class="check-row flex min-w-0 items-center gap-2.5 [&>input:not([type=checkbox])]:min-h-9 [&>input:not([type=checkbox])]:flex-1 [&>input:not([type=checkbox])]:rounded-lg [&>input:not([type=checkbox])]:px-0 [&>input:not([type=checkbox])]:py-2 [&>input:not([type=checkbox])]:text-sm [&>input:checked+input]:text-quiet [&>input:checked+input]:line-through"
                 data-check-id={c.id}
               >
                 <Checkbox
@@ -3382,16 +3849,17 @@ export default function App() {
           <Button
             size="small"
             variant="quiet"
-            class="add-check self-start px-3 py-1.5"
+            class="add-check justify-start self-start gap-2.5 px-0 py-1.5 [&>svg]:w-4.5"
             onClick={() => addCheck()}
           >
             <Plus size={13} />
             Checklist item
           </Button>
         </div>
-        <div class="editor-tools ml-10 mt-1.5 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.date-picker:first-child]:mr-auto">
+        <div class="editor-tools ml-10 mt-3 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.schedule-chip:first-child]:mr-auto [&>.schedule-chip:first-child_.date-picker>button]:px-0">
           <DatePicker
             compact
+            clearable
             kind="when"
             reminder={reminder()}
             changeReminder={setReminder}
@@ -3420,73 +3888,207 @@ export default function App() {
           </IconButton>
           <DatePicker
             compact
+            clearable
             kind="deadline"
             value={deadline()}
             change={setDeadline}
           />
         </div>
-        <Show when={!item.props.rp && (repeatOpen() || recurring())}>
-          <div class="repeat-panel pl-10 pr-0 py-2.5 [&_.field]:my-2">
-            <span class="muted text-muted">Repeat</span>
-            <Field label="Frequency">
-              <Select
-                value={repeat()}
-                onChange={(e) => setRepeat(e.currentTarget.value)}
-              >
-                <option value="">Never</option>
-                <option value="16">Daily</option>
-                <option value="256">Weekly</option>
-                <option value="8">Monthly</option>
-                <option value="4">Yearly</option>
-              </Select>
-            </Field>
-            <Show when={repeat()}>
-              <Field label="Every">
-                <Input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={interval()}
-                  onInput={(e) =>
-                    setInterval(
-                      Math.max(
-                        1,
-                        Math.min(99, Number(e.currentTarget.value) || 1),
-                      ),
-                    )
-                  }
-                />
-              </Field>
-              <p class="muted text-muted">
-                Future copies require Things on a connected device.
-              </p>
-            </Show>
-            <Show when={recurring()}>
-              <p class="muted text-muted">
-                This copy belongs to an existing repeating schedule.
-              </p>
-              <Button
-                onClick={() =>
-                  ask(
-                    "Stop future copies? Existing copies stay in your lists.",
-                    async () => {
-                      await mutate(
-                        {
-                          ...event(recurring()!, { tr: true }),
-                          ...event(item, { rt: [], rr: null, icsd: null }),
+        <Show when={recurring() || repeatRule()}>
+          <div class="repeat-panel ml-10 mt-2 text-sm">
+            <Popover
+              label="Repeating schedule"
+              size="compact"
+              triggerClass="h-auto min-h-8 w-full justify-start rounded-lg bg-hover px-2 py-2 text-left font-normal"
+              trigger={
+                <>
+                  <RotateCw size={16} class="text-upcoming" />
+                  <span class="min-w-0">
+                    <Show
+                      when={!isTemplate(item)}
+                      fallback={
+                        <span class="font-medium">
+                          {ruleSummary(repeatRule() || recurring()?.props.rr)}
+                          <span class="ml-2 text-quiet">
+                            {ruleDates(
+                              repeatRule() || recurring()?.props.rr,
+                              recurring()?.props.sr || undefined,
+                            )
+                              .map((stamp) =>
+                                new Date(stamp * 1000).toLocaleDateString(
+                                  "en",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    timeZone: "UTC",
+                                  },
+                                ),
+                              )
+                              .join(", ")}
+                          </span>
+                        </span>
+                      }
+                    >
+                      <span>This is a copy of a repeating to-do</span>
+                      <span class="block text-xs text-muted">
+                        {ruleSummary(repeatRule() || recurring()?.props.rr)}
+                      </span>
+                    </Show>
+                  </span>
+                </>
+              }
+            >
+              {(close) => (
+                <Menu close={close}>
+                  <MenuItem
+                    onClick={() => {
+                      setRepeatOpen(true);
+                      close();
+                    }}
+                  >
+                    <RotateCw size={16} />
+                    Edit Rule…
+                  </MenuItem>
+                  <MenuItem
+                    disabled={
+                      !recurring() ||
+                      !simpleRule(recurring()!.props.rr) ||
+                      !recurring()?.props.sr
+                    }
+                    onClick={() => {
+                      close();
+                      void run(async () => {
+                        if (await save()) {
+                          setState(await call("repeat_copy", { id: repeatId }));
+                          mutationVersion++;
+                          scheduleSync();
+                        }
+                      });
+                    }}
+                  >
+                    <Plus size={16} />
+                    Create Next Copy
+                  </MenuItem>
+                  <MenuItem
+                    disabled={
+                      !all().some(
+                        (copy) =>
+                          refs(copy, "rt").includes(repeatId) &&
+                          copy.id !== item.id,
+                      )
+                    }
+                    onClick={() => {
+                      close();
+                      void run(async () => {
+                        const copy = all()
+                          .filter(
+                            (copy) =>
+                              refs(copy, "rt").includes(repeatId) &&
+                              copy.id !== item.id &&
+                              !trashed(copy),
+                          )
+                          .sort(
+                            (a, b) => (b.props.sr || 0) - (a.props.sr || 0),
+                          )[0];
+                        if (copy && (await save())) {
+                          navigate(
+                            copy.props.ss
+                              ? "Logbook"
+                              : (copy.props.sr || 0) > today()
+                                ? "Upcoming"
+                                : "Today",
+                          );
+                          setSelected(copy.id);
+                          setEditing(copy.id);
+                        }
+                      });
+                    }}
+                  >
+                    <Search size={16} />
+                    Show Previous Copy
+                  </MenuItem>
+                  <MenuItem
+                    disabled={!recurring()}
+                    onClick={() => {
+                      close();
+                      void run(async () => {
+                        const series = recurring();
+                        if (series && (await save()))
+                          await mutate(
+                            event(series, { icp: !series.props.icp }),
+                            true,
+                          );
+                      });
+                    }}
+                  >
+                    <Moon size={16} />
+                    {recurring()?.props.icp ? "Resume" : "Pause"}
+                  </MenuItem>
+                  <MenuItem
+                    disabled={!recurring()}
+                    onClick={() => {
+                      close();
+                      ask(
+                        "Stop future copies? Existing copies stay in your lists.",
+                        async () => {
+                          const series = recurring();
+                          if (!series) return;
+                          const changes = event(series, { tr: true });
+                          for (const copy of all().filter((copy) =>
+                            refs(copy, "rt").includes(series.id),
+                          ))
+                            Object.assign(
+                              changes,
+                              event(copy, {
+                                rt: refs(copy, "rt").filter(
+                                  (id) => id !== series.id,
+                                ),
+                              }),
+                            );
+                          await mutate(changes, true);
+                          if (currentEditor === session) discardEditor();
+                          else releaseEditor(session);
                         },
-                        true,
                       );
-                      if (currentEditor === session) discardEditor();
-                      else releaseEditor(session);
-                    },
-                  )
-                }
-              >
-                Stop repeating
-              </Button>
-            </Show>
+                    }}
+                  >
+                    <X size={16} />
+                    Stop
+                  </MenuItem>
+                </Menu>
+              )}
+            </Popover>
           </div>
+        </Show>
+        <Show when={repeatOpen()}>
+          <RepeatRuleDialog
+            rule={repeatRule() || recurring()?.props.rr}
+            next={
+              repeatNext()
+                ? day(repeatNext())
+                : recurring()?.props.sr || (start() ? day(start()) : today())
+            }
+            options={
+              repeatRule()
+                ? repeatOptions()
+                : pref("repeatOptions", {})[`${state().account}:${repeatId}`]
+            }
+            close={() => setRepeatOpen(false)}
+            save={(rule, next, options) => {
+              setRepeatRule(rule);
+              setRepeatNext(next);
+              setRepeatOptions(options);
+              setRepeatOpen(false);
+              if (!recurring()) {
+                setStart(next);
+                setMode("Date");
+                if (options.deadlineOffset !== undefined)
+                  setDeadline(date(day(next) + options.deadlineOffset * 86400));
+                if (options.reminderTime)
+                  setReminder(next + "T" + options.reminderTime);
+              }
+            }}
+          />
         </Show>
         <Show when={editorFooter()}>
           {(mount) => (
@@ -3522,54 +4124,19 @@ export default function App() {
                     trigger={<ArrowRight size={16} />}
                   >
                     {(close) => (
-                      <>
-                        <div class="destination-list flex max-h-[50dvh] flex-col overflow-auto [&>button]:justify-start [&>button]:p-3 [&>button]:text-muted [&_small]:ml-auto [&_small]:text-quiet">
-                          <Button
-                            onClick={() => {
-                              setDestination("");
-                              setMode("Inbox");
-                              close();
-                            }}
-                          >
-                            <Inbox size={16} />
-                            Inbox
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setDestination("");
-                              if (mode() === "Inbox") setMode("Anytime");
-                              close();
-                            }}
-                          >
-                            <X size={16} />
-                            No Project
-                          </Button>
-                          <For
-                            each={all().filter(
-                              (e) =>
-                                (e.kind.startsWith("Area") ||
-                                  isProject(e) ||
-                                  isHeading(e)) &&
-                                active(e, all()) &&
-                                e.id !== item.id &&
-                                (!isProject(item) || e.kind.startsWith("Area")),
-                            )}
-                          >
-                            {(e) => (
-                              <Button
-                                onClick={() => {
-                                  setDestination(e.id);
-                                  if (mode() === "Inbox") setMode("Anytime");
-                                  close();
-                                }}
-                              >
-                                <Folder size={16} />
-                                {title(e)}
-                              </Button>
-                            )}
-                          </For>
-                        </div>
-                      </>
+                      <DestinationPicker
+                        all={all()}
+                        item={item}
+                        selected={destination()}
+                        choose={(dest, inbox) => {
+                          setDestination(dest?.id || "");
+                          if (inbox) {
+                            setMode("Inbox");
+                            setStart("");
+                          } else if (mode() === "Inbox") setMode("Anytime");
+                          close();
+                        }}
+                      />
                     )}
                   </Popover>
 
