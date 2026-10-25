@@ -31,13 +31,15 @@ import { Dynamic } from "solid-js/web";
 export function ListIcon(props: { name: string; size?: number }) {
   const icons = {
     Inbox,
-    Today: StarIcon,
+    Today: Star,
     Upcoming: CalendarDays,
     Anytime: Layers,
     Someday: Archive,
     Logbook: BookOpen,
     Trash: Trash2,
     "This Evening": EveningIcon,
+    Repeating: RotateCw,
+    Deadlines: Flag,
   };
   const colors: Record<string, string> = {
     Today: "text-accent",
@@ -45,6 +47,8 @@ export function ListIcon(props: { name: string; size?: number }) {
     Anytime: "text-anytime",
     Someday: "text-someday",
     "This Evening": "text-muted",
+    Repeating: "text-upcoming",
+    Deadlines: "text-deadline",
   };
   return (
     <Dynamic
@@ -53,10 +57,6 @@ export function ListIcon(props: { name: string; size?: number }) {
       class={colors[props.name] || "text-quiet"}
     />
   );
-}
-
-function StarIcon(props: Record<string, any>) {
-  return <Star {...props} fill="currentColor" />;
 }
 
 export function EntityIcon(props: { item: Entity; all: Entity[] }) {
@@ -97,7 +97,7 @@ export const isDueToday = (item: Entity) =>
     !!(item.props.sr || item.props.tir)) ||
     item.props.dd === today());
 
-export function AreaIcon(props: { stacked?: boolean }) {
+export function AreaIcon() {
   return (
     <svg
       class="area-icon size-4.5 shrink-0 text-mint"
@@ -109,9 +109,6 @@ export function AreaIcon(props: { stacked?: boolean }) {
       aria-hidden="true"
     >
       <path d="m4 7 8-4 8 4v9l-8 4-8-4Z M4 7l8 4 8-4" />
-      <Show when={props.stacked}>
-        <path d="m4 11 8 4 8-4 M4 15l8 4 8-4" />
-      </Show>
     </svg>
   );
 }

@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Check, Inbox, ListChecks, Search, X } from "lucide-solid";
+import { Check, ListChecks, Search, X } from "lucide-solid";
 import { Input, Button } from "./ui";
-import { EntityIcon } from "./TaskIndicators";
+import { EntityIcon, ListIcon } from "./TaskIndicators";
 import {
   active,
   descendants,
@@ -157,7 +157,7 @@ export default function DestinationPicker(props: {
                   when={entry.item}
                   fallback={
                     entry.id === "inbox" ? (
-                      <Inbox size={16} class="text-quiet" />
+                      <ListIcon name="Inbox" />
                     ) : (
                       <X size={16} class="text-quiet" />
                     )

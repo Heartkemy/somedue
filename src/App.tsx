@@ -11,18 +11,14 @@ import {
   batch,
 } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { Dynamic, Portal } from "solid-js/web";
+import { Portal } from "solid-js/web";
 import TagPicker from "./TagPicker";
 import DatePicker from "./DatePicker";
 import { Popover } from "./Popover";
 import { listen } from "@tauri-apps/api/event";
 import {
-  Inbox,
-  Star,
   CalendarDays,
-  Layers,
   Archive,
-  BookOpen,
   Trash2,
   Plus,
   Search,
@@ -138,7 +134,6 @@ type EditorDraft =
       destination: string;
       convert: boolean;
     };
-const navIcons = [Inbox, Star, CalendarDays, Layers, Archive, BookOpen, Trash2];
 const initial: State = {
   entities: [],
   account: "local",
@@ -1439,8 +1434,7 @@ export default function App() {
             <div class="sidebar-body min-h-0 flex-1 overflow-auto overscroll-contain px-4 pb-4 [scrollbar-gutter:stable]">
               <nav aria-label="Lists">
                 <For each={lists}>
-                  {(name, i) => {
-                    const Icon = navIcons[i()];
+                  {(name) => {
                     return (
                       <NavigationItem
                         aria-label={name}
@@ -1469,22 +1463,7 @@ export default function App() {
                           }
                         }}
                       >
-                        <Icon
-                          size={18}
-                          class={
-                            list() === name && !query()
-                              ? "text-accent"
-                              : [
-                                  "text-quiet",
-                                  "text-accent",
-                                  "text-upcoming",
-                                  "text-anytime",
-                                  "text-someday",
-                                  "text-quiet",
-                                  "text-quiet",
-                                ][i()]
-                          }
-                        />
+                        <ListIcon name={name} size={18} />
                         <span class="sidebar-label block min-w-0 truncate">
                           {name}
                         </span>
@@ -1550,7 +1529,7 @@ export default function App() {
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => dropIn(e, a)}
                         >
-                          <AreaIcon stacked={collapsed().includes(a.id)} />
+                          <AreaIcon />
                           <span class="sidebar-label block min-w-0 truncate">
                             {title(a)}
                           </span>
@@ -1778,7 +1757,7 @@ export default function App() {
                     setMenu(false);
                   }}
                 >
-                  <RotateCw size={16} /> Repeating items
+                  <ListIcon name="Repeating" /> Repeating items
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
@@ -1786,7 +1765,7 @@ export default function App() {
                     setMenu(false);
                   }}
                 >
-                  <Flag size={16} /> Deadlines
+                  <ListIcon name="Deadlines" /> Deadlines
                 </MenuItem>
                 <hr />
                 <MenuItem
@@ -1848,24 +1827,13 @@ export default function App() {
             >
               <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
                 <div class="heading-line flex items-baseline gap-3">
-                  <span class="page-symbol flex size-8 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-8 [&>svg]:shrink-0 [&>svg]:stroke-1 [&>.project-ring]:size-8">
-                    {list() === "Inbox" ? (
-                      <Inbox />
-                    ) : list() === "Today" ? (
-                      <Star />
-                    ) : list() === "Upcoming" ? (
-                      <CalendarDays />
-                    ) : list() === "Trash" ? (
-                      <Trash2 />
-                    ) : list() === "Logbook" ? (
-                      <BookOpen />
-                    ) : current() && isProject(current()!) ? (
-                      <ProjectProgress project={current()!} />
-                    ) : current()?.kind.startsWith("Area") ? (
-                      <AreaIcon />
-                    ) : (
-                      <Layers />
-                    )}
+                  <span class="page-symbol flex size-8 shrink-0 items-center justify-center self-center [&>svg]:size-8 [&>svg]:shrink-0">
+                    <Show
+                      when={current()}
+                      fallback={<ListIcon name={list()} size={32} />}
+                    >
+                      <EntityIcon item={current()!} all={all()} />
+                    </Show>
                   </span>
                   <h1 class="min-w-0 font-serif text-4xl leading-tight font-medium tracking-tight wrap-anywhere [&_[data-motion-word]]:inline-block">
                     <For
@@ -2030,7 +1998,7 @@ export default function App() {
               <Show
                 when={!loading()}
                 fallback={
-                  <div class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed">
+                  <div class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed">
                     <span class="loader m-5 size-5 animate-spin rounded-full border-2 border-quiet border-t-accent" />
                     Opening your workspace…
                   </div>
@@ -2043,7 +2011,7 @@ export default function App() {
                   }
                   fallback={
                     <div
-                      class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&.symbol-only_.empty-symbol]:text-muted [&.symbol-only_.empty-symbol]:opacity-15 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
+                      class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
                       classList={{ "symbol-only": !query() }}
                       role="status"
                       aria-label={
@@ -2052,18 +2020,20 @@ export default function App() {
                           : `${current() ? title(current()!) : list()} is empty`
                       }
                     >
-                      <div class="empty-symbol mb-3 grid size-16 place-items-center rounded-full text-mint opacity-75 [&>svg]:stroke-1">
-                        <Dynamic
-                          component={
-                            query()
-                              ? Search
-                              : navIcons[
-                                  lists.findIndex((name) => name === list())
-                                ] || Inbox
+                      <div class="empty-symbol mb-3 grid size-16 place-items-center rounded-full [&>svg]:size-21 [&>svg]:shrink-0">
+                        <Show
+                          when={query()}
+                          fallback={
+                            <Show
+                              when={current()}
+                              fallback={<ListIcon name={list()} size={84} />}
+                            >
+                              <EntityIcon item={current()!} all={all()} />
+                            </Show>
                           }
-                          size={84}
-                          fill={list() === "Today" ? "currentColor" : "none"}
-                        />
+                        >
+                          <Search size={84} class="text-quiet" />
+                        </Show>
                       </div>
                       <Show when={query()}>
                         <h2>Nothing found</h2>
@@ -2130,9 +2100,7 @@ export default function App() {
                                 <span class="grid w-4 shrink-0 place-items-center">
                                   <Show
                                     when={section().container}
-                                    fallback={
-                                      <Layers size={16} class="text-anytime" />
-                                    }
+                                    fallback={<ListIcon name="Anytime" />}
                                   >
                                     <EntityIcon
                                       item={section().container!}
@@ -3942,7 +3910,7 @@ export default function App() {
           </For>
           <Button
             size="small"
-            class="add-check justify-start self-start gap-2.5 py-1.5 [&>svg]:w-4.5"
+            class="add-check mt-2 justify-start self-start gap-2.5 py-1.5 [&>svg]:w-4.5"
             onClick={() => addCheck()}
           >
             <Plus size={13} />
@@ -3989,11 +3957,11 @@ export default function App() {
           />
         </div>
         <Show when={recurring() || repeatRule()}>
-          <div class="repeat-panel ml-7 mt-2 text-sm">
+          <div class="repeat-panel ml-7 mt-2 w-fit max-w-[calc(100%_-_--spacing(7))] text-sm">
             <Popover
               label="Repeating schedule"
               size="compact"
-              triggerClass="h-auto min-h-8 w-full justify-start rounded-lg bg-hover px-2 py-2 text-left font-normal"
+              triggerClass="h-auto min-h-8 max-w-full justify-start rounded-lg bg-hover px-2 py-2 text-left font-normal"
               trigger={
                 <>
                   <RotateCw size={16} class="text-upcoming" />
