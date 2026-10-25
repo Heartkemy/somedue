@@ -106,10 +106,31 @@ plate (`#262019`, radius 224) with mark bounds 128..896 (768px). Sharp generates
 PNG. Packaging emits 16, 32, 128, 256, 512-point 1x/2x PNGs and runs `iconutil`.
 Its image tests verify transparent outer corners and background padding.
 
-Somedue uses the supplied artwork in `assets/icon/app.svg` without redrawing it.
-`scripts/app-icon.mjs` reads that source and generates the PNG/ICNS bundle assets
-and `Somedue.iconset`. The icon test compares the rendered artwork with the source
-and verifies the required sizes.
+Somedue uses the refined `Carved-Check-Optimized.svg` supplied in Downloads,
+copied unchanged to `assets/icon/carved-check.svg`, including its turquoise inlay.
+Its viewBox already matches the actual 33..223 bounds, with no intrinsic margin;
+the paths, mask, clipping and colors are preserved. `scripts/app-icon.mjs` places the tightly
+cropped content at 192..832 (640px) on a brown 100..924 (824px) background with
+185.4px corner radius, within a transparent 1024px canvas. These are explicit
+design choices for the existing flattened macOS ICNS pipeline, not numeric
+requirements imposed by Apple.
+
+The generator writes `assets/icon/app.svg`, used by Settings and the README,
+then every PNG, `Somedue.iconset` representation and ICNS from that composition.
+The ICNS uses Apple's `iconutil`. Its 16/32px 1x ARGB entries need premultiplied RGB,
+so the generator prepares those two inputs in a temporary iconset; the published
+PNGs retain straight alpha. The test decodes all ten native entries and compares
+their alpha and visible color, allowing at most 3/255 native ARGB rounding error.
+Run `bun run icons` after editing the content. The icon test verifies tight
+content bounds, background/foreground spacing, every generated representation,
+and decoded ICNS pixels against the source.
+
+Apple's [app icon guidance](https://developer.apple.com/design/human-interface-guidelines/app-icons)
+(checked 2026-10-25) recommends centered primary content, a simple background,
+and consistent artwork. Its current layered workflow uses unmasked, full-bleed
+layers and system-rounded corners; it specifies no fixed foreground inset.
+This project retains its flattened legacy assets rather than claiming the
+pre-rounded composition is an Icon Composer layer.
 
 Apple's current [Icon Composer](https://developer.apple.com/icon-composer/)
 workflow uses layered artwork and Default/Dark/Mono variants. Its

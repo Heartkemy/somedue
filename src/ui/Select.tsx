@@ -5,6 +5,7 @@ import {
   onMount,
   onCleanup,
   For,
+  Show,
   type JSX,
 } from "solid-js";
 /** App-rendered single-select. The hidden select preserves form values and existing handlers;
@@ -12,7 +13,7 @@ import {
 export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
   const id = createUniqueId();
   const [options, setOptions] = createSignal<
-    { value: string; label: string; disabled: boolean }[]
+    { value: string; label: string; disabled: boolean; separator: boolean }[]
   >([]);
   const [opened, setOpened] = createSignal(false);
   const [active, setActive] = createSignal(0);
@@ -27,6 +28,10 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
       value: o.value,
       label: o.text,
       disabled: o.disabled,
+      separator:
+        o.parentElement?.tagName === "OPTGROUP" &&
+        o.parentElement.firstElementChild === o &&
+        o.index > 0,
     }));
     setOptions(items);
     const value = props.value == null ? native.value : String(props.value);
@@ -190,7 +195,7 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
         ref={popup}
         id={id}
         popover="auto"
-        class="select-popup fixed inset-auto m-0 overflow-auto overscroll-contain rounded-2xl border-0 bg-surface py-4.5 font-sans text-sm leading-6 text-ink shadow-2xl outline-none [scrollbar-width:thin] backdrop:bg-transparent"
+        class="select-popup fixed inset-auto m-0 overflow-auto overscroll-contain rounded-2xl border-0 bg-surface py-4.5 font-sans text-sm leading-6 text-ink shadow-xl ring-1 ring-ink/15 outline-none [scrollbar-width:thin] backdrop:bg-transparent"
         role="listbox"
         tabIndex={-1}
         aria-label={props["aria-label"] || "Options"}
@@ -200,25 +205,33 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
       >
         <For each={options()}>
           {(option, i) => (
-            <div
-              id={`${id}-${i()}`}
-              data-index={i()}
-              role="option"
-              aria-selected={
-                option.value === String(props.value ?? native?.value)
-              }
-              aria-disabled={option.disabled}
-              class="relative block min-h-9 cursor-pointer rounded-none bg-transparent px-3 py-2.5 wrap-anywhere aria-selected:bg-ink/4 aria-disabled:cursor-default aria-disabled:text-quiet aria-disabled:opacity-55 hover:not-aria-disabled:bg-ink/9 [&.active-option]:before:absolute [&.active-option]:before:top-1/2 [&.active-option]:before:left-0 [&.active-option]:before:h-1/2 [&.active-option]:before:w-0.5 [&.active-option]:before:-translate-y-1/2 [&.active-option]:before:rounded-r-sm [&.active-option]:before:bg-highlight [&.active-option]:before:content-['']"
-              classList={{
-                "active-option": active() === i(),
-                "disabled-option": option.disabled,
-              }}
-              onPointerMove={() => !option.disabled && setActive(i())}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => choose(i())}
-            >
-              <span>{option.label}</span>
-            </div>
+            <>
+              <Show when={option.separator}>
+                <hr
+                  role="separator"
+                  class="mx-3 my-2 border-0 border-t border-quiet/20"
+                />
+              </Show>
+              <div
+                id={`${id}-${i()}`}
+                data-index={i()}
+                role="option"
+                aria-selected={
+                  option.value === String(props.value ?? native?.value)
+                }
+                aria-disabled={option.disabled}
+                class="relative block min-h-9 cursor-pointer rounded-none bg-transparent px-3 py-2.5 wrap-anywhere aria-selected:bg-ink/4 aria-disabled:cursor-default aria-disabled:text-quiet aria-disabled:opacity-55 hover:not-aria-disabled:bg-ink/9 [&.active-option]:before:absolute [&.active-option]:before:top-1/2 [&.active-option]:before:left-0 [&.active-option]:before:h-1/2 [&.active-option]:before:w-0.5 [&.active-option]:before:-translate-y-1/2 [&.active-option]:before:rounded-r-sm [&.active-option]:before:bg-highlight [&.active-option]:before:content-['']"
+                classList={{
+                  "active-option": active() === i(),
+                  "disabled-option": option.disabled,
+                }}
+                onPointerMove={() => !option.disabled && setActive(i())}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(i())}
+              >
+                <span>{option.label}</span>
+              </div>
+            </>
           )}
         </For>
       </div>

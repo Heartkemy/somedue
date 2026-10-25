@@ -9,6 +9,9 @@ import {
   move,
   nextDate,
   uuid,
+  listSections,
+  upcomingDay,
+  title,
   type Entity,
 } from "../src/model";
 const e = (id: string, p: Record<string, unknown> = {}): Entity => ({
@@ -43,6 +46,45 @@ test("recurrence template stays hidden from search and lists", () => {
   expect(
     visible([e("template", { rr: { fu: 16 } })], "Inbox", "template"),
   ).toEqual([]);
+});
+test("Upcoming exposes future repeating templates and Trash includes blank titles and templates", () => {
+  const all = [
+    e("template", { rr: { fu: 16 }, sr: today() + 86400 }),
+    e("deleted", { rr: { fu: 16 }, tt: "", tr: true, md: 100 }),
+    e("older", { tr: true, md: 10 }),
+  ];
+  expect(visible(all, "Upcoming").map((item) => item.id)).toEqual(["template"]);
+  expect(visible(all, "Trash").map((item) => item.id)).toEqual([
+    "deleted",
+    "older",
+  ]);
+  expect(title(all[1])).toBe("New To-Do");
+});
+test("Upcoming sections include empty days and use the next future deadline", () => {
+  const task = e("past-start", {
+    sr: today() - 86400,
+    dd: today() + 2 * 86400,
+  });
+  expect(upcomingDay(task)).toBe(today() + 2 * 86400);
+  expect(listSections([task], [task], "Upcoming")).toHaveLength(30);
+  expect(listSections([task], [task], "Upcoming")[0].rows).toEqual([]);
+  expect(listSections([task], [task], "Upcoming", false)).toHaveLength(1);
+});
+test("Anytime groups heading-only children under their project and loose tasks under areas", () => {
+  const all: Entity[] = [
+    e("project", { tp: 1 }),
+    e("heading", { tp: 2, pr: ["project"] }),
+    e("child", { agr: ["heading"] }),
+    { id: "area", kind: "Area3", props: { tt: "Home" } },
+    e("loose", { ar: ["area"] }),
+  ];
+  const sections = listSections(visible(all, "Anytime"), all, "Anytime");
+  expect(
+    sections.map((section) => [section.id, section.rows.map((row) => row.id)]),
+  ).toEqual([
+    ["project", ["child"]],
+    ["area", ["loose"]],
+  ]);
 });
 test("calendar dates are timezone independent", () => {
   expect(date(day("2026-10-25"))).toBe("2026-10-25");

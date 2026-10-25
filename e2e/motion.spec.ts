@@ -102,7 +102,7 @@ test("source-backed headline and accelerating rows use one entry clock", async (
   await page.evaluate(() =>
     document.getAnimations().forEach((a) => a.finish()),
   );
-  await page.locator("#item-t0 .task-title").click();
+  await page.locator("#item-t0 .task-title").dblclick();
   const panelDelay = await page
     .locator(".task-editor")
     .evaluate((el) =>

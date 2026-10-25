@@ -72,6 +72,7 @@ impl Store {
         Ok(())
     }
 }
+#[cfg(test)]
 pub fn id() -> String {
     crate::cloud::new_id()
 }
@@ -126,6 +127,7 @@ pub fn prepare(changes: Value) -> Result<Value, String> {
     Ok(Value::Object(changes))
 }
 
+#[cfg(test)]
 pub fn active(id: &str, entities: &BTreeMap<String, Entity>) -> bool {
     fn walk(id: &str, all: &BTreeMap<String, Entity>, seen: &mut Vec<String>) -> bool {
         if seen.iter().any(|x| x == id) {

@@ -10,7 +10,9 @@ export default defineConfig({
     { name: "webkit", use: { browserName: "webkit" } },
   ],
   webServer: {
-    command: "bunx vite preview --host 127.0.0.1 --port 1422 --strictPort",
+    command:
+      process.env.SOMEDUE_TEST_SERVER ||
+      "bunx vite preview --host 127.0.0.1 --port 1422 --strictPort",
     url: "http://127.0.0.1:1422",
     reuseExistingServer: false,
   },

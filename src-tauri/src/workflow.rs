@@ -87,6 +87,38 @@ fn postcondition_met(pending: &Pending, remote: &Snapshot) -> bool {
         })
 }
 
+/// Network work owns a fixed prefix; edits queued since its last checkpoint stay local.
+pub(crate) fn merge_sync_checkpoint(
+    synced: &Workspace,
+    current: &Workspace,
+    previous_pending: usize,
+) -> Result<Workspace, String> {
+    let queued = current.pending.get(previous_pending..).ok_or(
+        "Pending edits changed during synchronization; the current workspace was preserved.",
+    )?;
+    let mut next = synced.clone();
+    next.pending.extend_from_slice(queued);
+    rebuild_view(&mut next)?;
+    Ok(next)
+}
+
+pub(crate) fn recover(
+    current: &Workspace,
+    remote: Snapshot,
+    pending_before_pull: usize,
+) -> Result<Workspace, String> {
+    if current.pending.len() != pending_before_pull {
+        return Err("New edits were saved while recovery was loading. Review your drafts and try again; nothing was replaced.".into());
+    }
+    Ok(Workspace {
+        history_fingerprint: Some(history_fingerprint(&remote.history)),
+        snapshot: remote.clone(),
+        authoritative: Some(remote),
+        pending: vec![],
+        last_sync: Some(chrono::Utc::now().to_rfc3339()),
+    })
+}
+
 /// The persisted `sending` state is the crash boundary: it is never automatically sent again.
 /// A returned pre-send failure is explicitly reset to queued; uncertainty remains blocked.
 pub(crate) async fn sync<R: Remote>(
@@ -197,9 +229,20 @@ pub(crate) fn mutate(
 ) -> Result<Workspace, String> {
     let mut changes = store::prepare(changes)?;
     crate::recurrence::normalize_creation(&workspace.snapshot.entities, &mut changes)?;
+    crate::recurrence::completion_changes(&workspace.snapshot.entities, &mut changes)?;
     for (id, event) in changes.as_object_mut().ok_or("Invalid changes")? {
         let old = workspace.snapshot.entities.get(id);
         let p = event["p"].as_object().ok_or("Invalid fields")?;
+        if old.is_some_and(|item| !item.props["rr"].is_null())
+            && p.get("ss")
+                .and_then(Value::as_i64)
+                .is_some_and(|status| status != 0)
+        {
+            return Err(
+                "Repeating templates cannot be completed; complete their current copy instead."
+                    .into(),
+            );
+        }
         let stops_series = old.is_some_and(|e| {
             (e.props.get("rr").is_some_and(|v| !v.is_null())
                 && (p.get("rr") == Some(&Value::Null)
@@ -236,6 +279,23 @@ pub(crate) fn mutate(
             base,
             status: "queued".into(),
         });
+    }
+    Ok(next)
+}
+
+pub(crate) fn materialize(
+    workspace: &Workspace,
+    today: i64,
+    cloud_account: bool,
+) -> Result<Workspace, String> {
+    let mut next = workspace.clone();
+    // Bound catch-up after a long absence; later loads continue from the saved next date.
+    for _ in 0..32 {
+        let changes = crate::recurrence::due_changes(&next.snapshot.entities, today);
+        if changes.as_object().is_none_or(|map| map.is_empty()) {
+            break;
+        }
+        next = mutate(&next, changes, false, cloud_account)?;
     }
     Ok(next)
 }
@@ -472,6 +532,20 @@ mod tests {
         assert!(remaining.contains(&1));
         assert!(workspace.pending.is_empty());
         assert_eq!(workspace.snapshot.entities[&id].props["tt"], "Second");
+    }
+    #[test]
+    fn recovery_does_not_discard_edits_saved_during_the_cloud_pull() {
+        let (base, id) = fixture();
+        let first = edit(&base, &id, "Existing draft");
+        let concurrent = edit(&first, &id, "New draft during recovery");
+        assert!(recover(&concurrent, base.snapshot.clone(), first.pending.len()).is_err());
+        assert_eq!(
+            concurrent.snapshot.entities[&id].props["tt"],
+            "New draft during recovery"
+        );
+        let restored = recover(&concurrent, base.snapshot, concurrent.pending.len()).unwrap();
+        assert!(restored.pending.is_empty());
+        assert_eq!(restored.snapshot.entities[&id].props["tt"], "Original");
     }
     #[test]
     fn reconnect_preserves_original_drafts_and_rejects_changed_history() {

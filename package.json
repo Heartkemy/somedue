@@ -16,7 +16,8 @@
     "test:keychain": "bun scripts/keychain-test.mjs",
     "test:installed": "bun scripts/installed-keychain-test.mjs",
     "test:native": "bun scripts/native-test.mjs",
-    "test:ui": "bun run build && playwright test"
+    "test:ui": "bun run build && playwright test",
+    "test:ui:docker": "bun run build && bun scripts/ui-test-docker.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.2.8",

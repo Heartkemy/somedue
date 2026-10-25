@@ -26,12 +26,17 @@ endorsed by Cultured Code, the makers of Things.
   Mac; optional Things Cloud sync includes conflict and draft recovery controls.
 - **Set local reminders:** notifications fire while Somedue is running.
 
+Click a to-do to select it. Press Enter or double-click to edit it; click empty
+space to clear the selection. Drag checklist items by their right-hand handles,
+or use Option ↑ / ↓ while editing an item.
+
 ## Current limitations
 
 Somedue does not yet implement everything Things can do. Advanced repeating-task
-rules, calendar and Apple Reminders import, full multi-selection, multiple main
-windows, and native automation are incomplete. Future copies of repeating tasks
-require the original Things app on a connected device. Reminders created in
+rules, calendar and Apple Reminders import, multiple main windows, and native
+automation are incomplete. Simple daily, weekly, monthly, yearly and
+after-completion rules create copies locally. Advanced imported rules, repeating
+projects and newer opaque repeaters still require Things. Reminders created in
 Somedue are local and do not sync to other devices.
 
 Only macOS is supported. Things Cloud access uses an unofficial protocol, and the
@@ -75,12 +80,16 @@ fingerprint, then package and install:
 ```sh
 export SOMEDUE_CODESIGN_IDENTITY="YOUR_40_CHARACTER_CERTIFICATE_FINGERPRINT"
 bun run install:macos
-open -a /Applications/Somedue.app
 ```
 
 The packaging script generates icons, builds the app, stages its signed Keychain
 helper, verifies signatures, and installs `/Applications/Somedue.app`. It backs up
-an existing Somedue installation before replacing it. Without a configured
+an existing Somedue installation before replacing it, then quits the old instance
+normally and opens the updated app. Save any open edits before running it.
+
+Once signing is configured, `bun run install:macos` is the one-shot update command.
+It builds the current working files, including uncommitted changes; no commit or
+branch switch is required. Without a configured
 certificate, it produces an ad-hoc local build that cannot save Cloud credentials.
 
 You can also store the fingerprint in
@@ -99,6 +108,9 @@ Import shared controls from `src/ui.tsx`; their implementations live in `src/ui/
 `Button` and `IconButton` own their size and variant styles. `Input` and `Textarea`
 offer a `plain` variant for writing surfaces. Their `class` props use
 `tailwind-merge`, so caller utilities can override defaults without CSS overrides.
+Use `Button align="content"` to align its contents while preserving hover padding.
+`NavigationItem` and `ListHeading` share navigation geometry and list hierarchy.
+`UnderlineTab` follows Samlad's serif tabs and growing active underline.
 Use `Field`, `Dialog`, `Select`, `Menu`, `Checkbox`, `Kbd`, and `SectionHeading`
 for the corresponding shared UI patterns.
 
@@ -116,6 +128,7 @@ bun run build          # TypeScript check and production frontend build
 bun test tests         # Model, motion, and editor-save tests
 bun run test:native    # Rust tests; requires cached Cargo dependencies
 bun test scripts/app-icon.test.mjs
+bun run test:ui:docker # Chromium and WebKit checks in the matching Playwright image
 ```
 
 The native test runner and packaging script use
