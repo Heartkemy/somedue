@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "windows": ["main", "quick-entry"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-hide"
+  ]
+}

@@ -1,0 +1,341 @@
+{
+  "reference": "https://robolabs.so/",
+  "capturedAt": "2026-10-24T19:27:53.400Z",
+  "units": {
+    "time": "seconds",
+    "translation": "CSS px",
+    "offset": "zero-based JS string character index"
+  },
+  "sources": {
+    "home": {
+      "url": "https://framerusercontent.com/sites/3PGxM0UjwytjHMhR3SPbIR/lD8_aHbipA8bK6zcMvHZ5YoSy4MYM81I6J1K26KPRmo.vxpy8mEF.mjs",
+      "local": "/tmp/robolabs-home.txt",
+      "sha256": "4de88842afecb6e0c2c863af2c3f7c26169a2bd3f3970e1f6ea47d8f596dcf4e",
+      "characters": 531135
+    },
+    "framer": {
+      "url": "https://framerusercontent.com/sites/3PGxM0UjwytjHMhR3SPbIR/framer.Fo2EXurd.mjs",
+      "local": "/tmp/robolabs-framer.txt",
+      "sha256": "9eebc196ff67768ae42b05fd6910e66f240f86b93537ea7d02bd039d009f863c",
+      "characters": 447918
+    },
+    "motion": {
+      "url": "https://framerusercontent.com/sites/3PGxM0UjwytjHMhR3SPbIR/motion.C3e-GSWV.mjs",
+      "local": "/tmp/robolabs-motion.txt",
+      "sha256": "d7a56b1b32d769e58922ff311a2d2609ea81363053f182bbb18b9b50a0c3f2e1",
+      "characters": 146531
+    },
+    "shared": {
+      "url": "https://framerusercontent.com/sites/3PGxM0UjwytjHMhR3SPbIR/shared-lib.DG5NZdOa.mjs",
+      "local": "/tmp/robolabs-shared.txt",
+      "sha256": "466bcc3dec9cbf64dc5b9b0f15023b93b661459fdd322996ecdec2618040fb05",
+      "characters": 97452
+    },
+    "footer": {
+      "url": "https://framerusercontent.com/sites/3PGxM0UjwytjHMhR3SPbIR/rDTuixtIv.CJOz2Eo0.mjs",
+      "local": "/tmp/robolabs-components.txt",
+      "sha256": "c2d3698c1baef59fb97e2b39d4d2fa738362077dbd99bb027119d5a6f607b443",
+      "characters": 49527
+    }
+  },
+  "exact": {
+    "homeConfig": {
+      "offset": 451824,
+      "literal": "bm={opacity:0,rotate:0,rotateX:0,rotateY:0,scale:1,skewX:0,skewY:0,x:0,y:15},xm={damping:50,delay:0,mass:1,stiffness:210,type:`spring`},Sm={filter:`blur(10px)`,opacity:.001,rotate:0,scale:1,skewX:0,skewY:0,x:0,y:10},Cm={effect:Sm,repeat:!1,startDelay:0,threshold:0,tokenization:`word`,transition:{bounce:0,delay:.05,duration:.7,type:`spring`},trigger:`onInView`,type:`appear`},wm={effect:Sm,repeat:!1,startDelay:.5,threshold:0,tokenization:`word`,transition:{bounce:0,delay:.03,duration:.6,type:`spring`},trigger:`onInView`,type:`appear`},Tm={bounce:0,delay:1,duration:.6,type:`spring`},Em={damping:70,delay:1.3,mass:1,stiffness:210,type:`spring`},Dm={damping:70,delay:0,mass:1,stiffness:210,type:`spring`},Om={opacity:0,rotate:0,rotateX:0,rotateY:0,scale:1,skewX:0,skewY:0,x:0,y:20},km={damping:70,delay:.2,mass:1,stiffness:210,type:`spring`},Am={damping:70,delay:.4,mass:1,stiffness:210,type:`spring`},jm={opacity:0,rotate:0,rotateX:0,rotateY:0,scale:1,skewX:0,skewY:0,x:0,y:45},Mm={damping:70,delay:.6,mass:1,stiffness:210,type:`spring`},Nm={damping:70,delay:.8,mass:1,stiffness:210,type:`spring`},Pm={damping:70,delay:1,mass:1,stiffness:210,type:`spring`},Fm={damping:70,delay:1.2,mass:1,stiffness:210,type:`spring`}"
+    },
+    "hero": {
+      "onlineBadge": {
+        "selector": ".framer-1wzcq91-container",
+        "from": {
+          "opacity": 0,
+          "y": 15
+        },
+        "to": {
+          "opacity": 1,
+          "y": 0
+        },
+        "transition": {
+          "type": "spring",
+          "stiffness": 210,
+          "damping": 50,
+          "mass": 1,
+          "delay": 0
+        },
+        "once": true,
+        "threshold": 0
+      },
+      "headline": {
+        "selector": ".framer-geyzna",
+        "from": {
+          "opacity": 0.001,
+          "y": 10,
+          "filter": "blur(10px)"
+        },
+        "to": {
+          "opacity": 1,
+          "y": 0,
+          "filter": "none"
+        },
+        "tokenization": "word",
+        "startDelay": 0,
+        "stagger": 0.05,
+        "transition": {
+          "type": "spring",
+          "bounce": 0,
+          "duration": 0.7,
+          "restDelta": 0.001
+        },
+        "repeat": false,
+        "trigger": "onInView",
+        "threshold": 0
+      },
+      "description": {
+        "selector": ".framer-1xrsuyw",
+        "from": {
+          "opacity": 0.001,
+          "y": 10,
+          "filter": "blur(10px)"
+        },
+        "to": {
+          "opacity": 1,
+          "y": 0,
+          "filter": "none"
+        },
+        "tokenization": "word",
+        "startDelay": 0.5,
+        "stagger": 0.03,
+        "transition": {
+          "type": "spring",
+          "bounce": 0,
+          "duration": 0.6,
+          "restDelta": 0.001
+        },
+        "repeat": false,
+        "trigger": "onInView",
+        "threshold": 0
+      },
+      "cta": {
+        "selector": ".framer-wjh74x-container",
+        "from": {
+          "opacity": 0,
+          "y": 15
+        },
+        "transition": {
+          "type": "spring",
+          "bounce": 0,
+          "duration": 0.6,
+          "delay": 1
+        },
+        "once": true,
+        "threshold": 0
+      },
+      "clients": {
+        "selector": ".framer-1byyrkg",
+        "from": {
+          "opacity": 0,
+          "y": 15
+        },
+        "transition": {
+          "type": "spring",
+          "stiffness": 210,
+          "damping": 70,
+          "mass": 1,
+          "delay": 1.3
+        },
+        "once": true,
+        "threshold": 0
+      }
+    },
+    "services": {
+      "transition": {
+        "type": "spring",
+        "stiffness": 210,
+        "damping": 70,
+        "mass": 1
+      },
+      "once": true,
+      "groupTrigger": {
+        "target": "Services section ref C, id uTrHOqYco",
+        "offset": 40,
+        "threshold": 0.5,
+        "sourceSemantics": "Scroll-target trigger, not per-child 50% intersection. Runtime xc computes startScroll=max(sectionOffsetTop - 1 - 40 - .5*viewportHeight,0); Dc uses shared target for all service children."
+      },
+      "sequence": [
+        {
+          "role": "eyebrow",
+          "selector": ".framer-1kws0ac-container",
+          "delay": 0,
+          "y": 15
+        },
+        {
+          "role": "heading",
+          "selector": ".framer-2ep30i",
+          "delay": 0.2,
+          "y": 20
+        },
+        {
+          "role": "description",
+          "delay": 0.4,
+          "y": 15
+        },
+        {
+          "role": "card 1",
+          "selector": ".framer-1knpey",
+          "delay": 0.6,
+          "y": 45
+        },
+        {
+          "role": "card 2",
+          "selector": ".framer-vhdely",
+          "delay": 0.8,
+          "y": 45
+        },
+        {
+          "role": "card 3",
+          "selector": ".framer-1nbluwi",
+          "delay": 1,
+          "y": 45
+        },
+        {
+          "role": "CTA",
+          "selector": ".framer-1wve8mz-container",
+          "delay": 1.2,
+          "y": 15
+        }
+      ],
+      "fromOpacity": 0,
+      "to": {
+        "opacity": 1,
+        "y": 0
+      }
+    },
+    "footer": {
+      "source": "footer",
+      "offset": 19400,
+      "transition": {
+        "type": "spring",
+        "stiffness": 210,
+        "damping": 70,
+        "mass": 1
+      },
+      "sequence": [
+        {
+          "role": "logo",
+          "delay": 0
+        },
+        {
+          "role": "heading",
+          "delay": 0.2
+        },
+        {
+          "role": "description",
+          "delay": 0.4
+        },
+        {
+          "role": "CTA",
+          "delay": 0.6
+        }
+      ],
+      "from": {
+        "opacity": 0,
+        "y": 15
+      },
+      "once": true,
+      "threshold": 0
+    },
+    "menu": {
+      "source": "shared",
+      "symbol": "ht",
+      "offset": 83141,
+      "transition": {
+        "type": "spring",
+        "stiffness": 400,
+        "damping": 40,
+        "mass": 1,
+        "delay": 0
+      },
+      "variantMapping": {
+        "Phone": "D2WlhEE0c",
+        "Phone Open": "mTNdKI81R"
+      },
+      "initial": false,
+      "openVariants": {
+        "navRadius": 24,
+        "contentRadius": 23,
+        "iconBottomRotate": -45,
+        "iconTopRotate": 45
+      },
+      "childStagger": "No explicit child stagger in nav component; links conditionally render for open variant."
+    },
+    "otherInteractions": {
+      "buttonVariantSpring": {
+        "source": "shared",
+        "symbol": "ke",
+        "type": "spring",
+        "stiffness": 500,
+        "damping": 60,
+        "mass": 1,
+        "delay": 0
+      },
+      "accordionLayoutSpring": {
+        "source": "home",
+        "symbol": "wu",
+        "type": "spring",
+        "stiffness": 500,
+        "damping": 60,
+        "mass": 1,
+        "delay": 0
+      },
+      "accordionContentFade": {
+        "source": "home",
+        "symbols": [
+          "Eu",
+          "Ou"
+        ],
+        "type": "tween",
+        "duration": [
+          0.5,
+          0.3
+        ],
+        "ease": [
+          0.44,
+          0,
+          0.56,
+          1
+        ],
+        "delay": 0
+      }
+    },
+    "runtime": {
+      "textTokenization": "framer om, offset149089: split text on spaces; each word span separate ref; empty terminal spans may occupy stagger slots.",
+      "stagger": "framer fm, offset152252: delay:pe(r?.delay??0,{startDelay:i}), restDelta:.001; motion Vn offset22165 gives startDelay+step*abs(index-from), default from0.",
+      "textViewport": "framer um offset150700: onInView calls Oe(element,callback,{amount:threshold??0}); repeat:false guards rerun.",
+      "elementViewport": "framer rs offset66813: intersectionRect.height / min(element.height,window.innerHeight) >= threshold, default rootMargin 0px. Thus .5 is vertical-visible fraction for non-target elements, not necessarily raw IO area ratio.",
+      "reducedMotion": "framer am/lm and Dc skip transform/filter, retaining opacity; source does not establish disabling every animation."
+    }
+  },
+  "observed": {
+    "method": "Ego page 1, viewport1512x872, screenshot and passive DOM extraction only; no browser tests",
+    "screenshot": "/tmp/things-robolabs-rendered.png",
+    "initialScreenshot": "Hero first words readable while later words blurred/invisible, supporting copy/CTA absent; confirms progressive word reveal qualitatively, not timed measurement.",
+    "settledHeadline": "word spans inline-block, opacity1, filter blur(0px), transform none",
+    "untriggeredServiceCards": {
+      "opacity": 0,
+      "transform": "translateY(45px)",
+      "top": 1219.78125
+    }
+  },
+  "adaptation": {
+    "classification": "Implementation recommendation, not source behavior of a task app; reference contains no task list/editor.",
+    "initialView": "Use one shared entry clock. Header/eyebrow0, main heading .2, supporting controls .4, list rows .6+.2*index with spring210/70/1. Use y15 for text/rows, y20 heading; reserve y45 for large panel/card. This copies section choreography, including 200ms stagger.",
+    "heroAlternative": "For a deliberate first-load title use word spans y10/blur10/opacity.001 to normal; spring duration.7/bounce0 and .05 per word. Supporting line start.5 with .03 per word/.6 spring.",
+    "editorAndMenu": "Use immediate fast spring400/40/1 (menu) or500/60/1 (component/layout) for user-opened editor/menu. Do not apply the 1–1.3s hero delays to ordinary interactions. Apply long coordinated timeline only once per view entry, not task completion/typing/reordering.",
+    "caveat": "No fabricated CSS cubic-bezier replacement for springs. Physics-configured springs have no exact fixed source duration. Any shorter row cap, different stagger, or CSS curve fit is an adaptation and must be labeled."
+  },
+  "uncertainties": [
+    "No frame-timed performance measurement; exact timings come from published source literals and runtime formulas.",
+    "Rendered evidence desktop only; phone menu source read but not interacted with.",
+    "Spring completion time depends on property distance and runtime rest thresholds; explicit duration applies only to duration/bounce springs.",
+    "Mapping marketing motion onto a Things task editor/list is a design adaptation."
+  ]
+}

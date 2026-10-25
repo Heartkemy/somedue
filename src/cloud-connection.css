@@ -1,0 +1,155 @@
+.cloud-screen {
+  position: fixed;
+  inset: 0;
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 0;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: auto;
+}
+.cloud-screen::backdrop {
+  background: #0b090780;
+  backdrop-filter: blur(5px);
+}
+
+.cloud-screen-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  padding: 28px;
+}
+.cloud-card {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  margin: auto;
+  text-align: center;
+  padding: 12px 6px;
+}
+.cloud-back {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+}
+.cloud-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 22px;
+  border-radius: 20px;
+  background: var(--selection);
+  color: var(--accent);
+}
+.cloud-card h1 {
+  font:
+    600 24px/1.25 "Space Grotesk",
+    sans-serif;
+  letter-spacing: -0.025em;
+  outline: none;
+}
+.cloud-intro {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 14px 0 26px;
+}
+.cloud-card form {
+  text-align: left;
+}
+.cloud-card form > .primary {
+  width: 100%;
+  margin-top: 6px;
+}
+.cloud-privacy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 20px 0 12px;
+}
+.cloud-privacy svg {
+  flex: none;
+}
+.cloud-error {
+  text-align: left;
+  background: #e96a5515;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 20px 0;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.cloud-error p {
+  margin: 5px 0;
+}
+.cloud-error small {
+  color: var(--muted);
+}
+.sync-activity {
+  height: 4px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--hover);
+  margin: 30px 0;
+}
+.sync-activity span {
+  display: block;
+  height: 100%;
+  width: 32%;
+  border-radius: inherit;
+  background: var(--mint);
+  animation: sync-progress 1.8s ease-in-out infinite alternate;
+}
+@keyframes sync-progress {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(240%);
+  }
+}
+.sync-steps {
+  list-style: none;
+  text-align: left;
+  padding: 0;
+  margin: 0 auto;
+  width: fit-content;
+  color: var(--quiet);
+  font-size: 13px;
+}
+.sync-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 16px 0;
+}
+.sync-steps .done {
+  color: var(--mint);
+}
+.sync-steps .current {
+  color: var(--ink);
+}
+.sync-count {
+  margin-top: 24px;
+  font:
+    11px/1.5 "JetBrains Mono",
+    monospace;
+  color: var(--muted);
+}
+.cloud-footnote {
+  margin: 24px auto 0;
+  max-width: 320px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}

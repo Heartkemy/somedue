@@ -1,0 +1,607 @@
+/* Shared control geometry, color and focus behavior. */
+.app {
+  --radius-pill: 999px;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-dialog: 14px;
+  --radius-lg: 20px;
+  --control-height: 40px;
+  --field: #1f1a15;
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--mint);
+}
+.app[data-theme="light"] {
+  --field: #e9e1d5;
+}
+button {
+  border-radius: var(--radius-pill);
+  letter-spacing: -0.2px;
+}
+.primary {
+  min-height: var(--control-height);
+  padding: 0 17px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 13.16px;
+  font-weight: 600;
+  line-height: 1;
+  gap: 9px;
+}
+.primary:hover {
+  background: var(--ink);
+  filter: brightness(0.96);
+}
+.primary kbd {
+  color: var(--bg);
+  opacity: 0.65;
+}
+input,
+textarea,
+select {
+  border-radius: var(--radius);
+  caret-color: var(--mint);
+  letter-spacing: -0.2px;
+  transition:
+    background-color 210ms ease,
+    box-shadow 210ms ease;
+}
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  min-height: var(--control-height);
+  font-size: 13.16px;
+  line-height: 1.5;
+  padding: 9px 12px;
+}
+.field input:hover,
+.field textarea:hover,
+.field select:hover {
+  background-color: var(--hover);
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+.app[data-theme="light"] input[type="date"] {
+  color-scheme: light;
+}
+dialog {
+  margin: auto;
+  inset: 0;
+  border-radius: var(--radius-dialog);
+  max-height: calc(100dvh - 60px);
+  box-shadow:
+    0 24px 60px -12px #080604b8,
+    0 8px 20px -8px #08060480;
+}
+dialog::backdrop {
+  background: #0a0806a6;
+  backdrop-filter: blur(2px);
+}
+.dialog-header h2 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.nav-item,
+.project-nav,
+.area-row > button,
+.settings-layout > nav > button {
+  border-radius: var(--radius-sm);
+}
+.task-row {
+  border-radius: var(--radius-sm);
+}
+.task-check {
+  border-radius: 4px;
+}
+.task-check.project {
+  border-radius: 50%;
+}
+.task-title {
+  border-radius: 0;
+}
+.task-editor {
+  border-radius: 12px;
+}
+.popover {
+  border-radius: 12px;
+}
+.floating-surface {
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  backdrop-filter: blur(20px);
+  color: var(--ink);
+}
+.toast {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog-header {
+  flex: none;
+}
+.dialog-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  margin: -6px;
+}
+.settings-layout > nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+@media (max-height: 650px) {
+  .settings-layout {
+    min-height: 0;
+  }
+  .settings-content {
+    max-height: none;
+  }
+}
+
+.select-control {
+  min-width: 0;
+  width: 100%;
+}
+.select-control select[hidden] {
+  display: none;
+}
+/* Picker geometry and states follow the reference select primitive. */
+.select-trigger {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  background: var(--field);
+  border: 0;
+  text-align: left;
+  font-size: 13.16px;
+  line-height: 1.5;
+}
+.select-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select-trigger > svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.select-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+.select-trigger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 6.3%, transparent);
+}
+.select-popup {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 18px 0;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    0 12px 32px -8px #080604b8,
+    0 3px 10px #08060466;
+  overflow: auto;
+  overscroll-behavior: contain;
+  font:
+    13.16px/1.5 "Space Grotesk",
+    sans-serif;
+  outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 15%, transparent) transparent;
+}
+.select-popup::backdrop {
+  background: transparent;
+}
+.select-popup [role="option"] {
+  display: block;
+  min-height: 36px;
+  padding: 10px 12px;
+  border-radius: 0;
+  position: relative;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+.select-popup [aria-selected="true"] {
+  background: color-mix(in srgb, var(--ink) 4.3%, transparent);
+}
+.select-popup [role="option"]:hover:not([aria-disabled="true"]) {
+  background: color-mix(in srgb, var(--ink) 8.6%, transparent);
+}
+.select-popup .active-option::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 50%;
+  width: 2px;
+  background: #ffc200;
+  border-radius: 0 1px 1px 0;
+}
+.select-popup .disabled-option {
+  color: var(--quiet);
+  opacity: 0.55;
+  cursor: default;
+}
+.field,
+.field-grid > *,
+.editor-fields > * {
+  min-width: 0;
+}
+@media (max-width: 820px) {
+  .editor-fields {
+    flex-wrap: wrap;
+  }
+}
+
+/* Reserve room for focus rings within scrolling dialog content. */
+.settings-content {
+  max-height: none;
+  overflow: visible;
+  min-width: 0;
+}
+.dialog-header {
+  gap: 16px;
+}
+.dialog-header h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dialog-actions {
+  flex-wrap: wrap;
+  padding: 4px;
+  margin-right: -4px;
+  margin-left: -4px;
+}
+.list-menu {
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+}
+/* Explicit checkbox rendering keeps WebKit and the system accent out of the design. */
+.app input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 6.3%, transparent);
+  color: #241c14;
+  cursor: pointer;
+  transition: background-color 130ms;
+}
+.app input[type="checkbox"]::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(8% 48%, 21% 35%, 42% 56%, 80% 17%, 94% 30%, 42% 84%);
+  transform: scale(0.4);
+  opacity: 0;
+  transition:
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 100ms;
+}
+.app input[type="checkbox"]:checked,
+.app input[type="checkbox"]:indeterminate {
+  background: #ffc200;
+}
+.app input[type="checkbox"]:checked::after,
+.app input[type="checkbox"]:indeterminate::after {
+  opacity: 1;
+  transform: scale(1);
+}
+.app input[type="checkbox"]:indeterminate::after {
+  clip-path: inset(42% 8%);
+}
+.app input[type="checkbox"]:not(:checked):not(:disabled):hover,
+.check-label:hover input[type="checkbox"]:not(:checked):not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 8.6%, transparent);
+}
+.app input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+.app input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.check-label {
+  gap: 9px;
+  cursor: pointer;
+}
+@media (forced-colors: active) {
+  .app input[type="checkbox"] {
+    appearance: auto;
+  }
+  .app input[type="checkbox"]::after {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app input[type="checkbox"]::after {
+    transition: none;
+  }
+}
+
+/* Action geometry belongs to primitives, never to the surrounding panel. */
+.control-button {
+  min-height: 40px;
+  padding: 0 17px;
+  gap: 9px;
+  border-radius: 999px;
+  font-size: 13.16px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.control-button > svg {
+  flex: none;
+}
+.control-button[data-size="small"] {
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.control-button.icon-button {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  gap: 0;
+  flex: 0 0 40px;
+  border-radius: 50%;
+}
+.control-button.icon-button[data-size="small"] {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  flex-basis: 32px;
+}
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+.search-box {
+  min-width: 0;
+  width: min(300px, 65%);
+  padding: 0 12px;
+  height: 40px;
+  gap: 9px;
+  border-radius: 999px;
+}
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  height: 100%;
+  border-radius: 0;
+}
+.search-box > svg,
+.search-box > kbd {
+  flex: none;
+}
+.search-box:has(input:focus-visible) {
+  box-shadow: var(--focus);
+  background: var(--field);
+}
+.search-box input:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+.search-box .icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  flex-basis: 24px;
+}
+.dialog-header {
+  margin-bottom: 20px;
+}
+dialog {
+  animation: dialog-enter 160ms ease-out;
+}
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.field-grid {
+  gap: 16px;
+}
+.sidebar-hint .control-button {
+  margin-top: 6px;
+}
+
+.settings-content form + p {
+  margin-top: 16px;
+}
+.heading-line {
+  align-items: baseline;
+}
+.page-symbol {
+  align-self: center;
+  flex: none;
+}
+h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.control-button[data-variant="secondary"]:not(.primary):not(.danger) {
+  background: color-mix(in srgb, var(--ink) 2.75%, transparent);
+}
+.control-button[data-variant="secondary"]:not(.primary):not(.danger):hover {
+  background: color-mix(in srgb, var(--ink) 6.3%, transparent);
+}
+.control-button[data-variant="quiet"] {
+  color: var(--muted);
+  background: transparent;
+}
+.control-button[data-variant="primary"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.control-button[data-variant="danger"] {
+  background: #e2564a1f;
+  color: var(--danger);
+}
+.control-button:disabled {
+  cursor: default;
+}
+.control-button.primary:disabled {
+  background: var(--hover);
+  color: var(--quiet);
+  opacity: 1;
+}
+
+/* Dense task tools use explicit geometry instead of inheriting settings buttons. */
+.control-button[data-size="compact"] {
+  min-height: 28px;
+  padding: 4px 8px;
+  gap: 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.control-button.icon-button[data-size="compact"] {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 4px;
+  flex-basis: 28px;
+  border-radius: 6px;
+}
+
+/* Pointer activation must not inherit a keyboard focus ring (including WebKit). */
+html[data-input-modality="pointer"]
+  .app
+  :is(button, input, textarea, select, summary, [tabindex]):focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* Samlad's header options: quiet icon rows inside one floating surface. */
+.ui-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ui-menu > .ui-menu-item {
+  width: 100%;
+  min-height: 38px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 11px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  background: transparent;
+}
+.ui-menu-item > svg {
+  flex: none;
+}
+.ui-menu-item kbd {
+  margin-left: auto;
+}
+.ui-menu > .ui-menu-item:hover,
+.ui-menu > .ui-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8.6%, transparent);
+  outline: none;
+  box-shadow: none;
+}
+.control-popover:has(> .control-popover-body > .ui-menu) {
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  backdrop-filter: blur(20px);
+}
+.control-popover-body:has(> .ui-menu) {
+  padding: 9px;
+  gap: 0;
+}
+.list-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 76px);
+  padding: 9px;
+  top: 48px;
+}
+.list-menu hr {
+  width: calc(100% - 16px);
+  margin: 3px 8px;
+  border: 0;
+  border-top: 1px solid var(--hover);
+}
+.menu-connection {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 11px 13px;
+}
+.menu-connection strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.menu-connection > span:last-child {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.menu-status-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mint) 16%, transparent);
+}
+.menu-status-mark.pending {
+  background: var(--accent);
+}
+.menu-status-mark.blocked {
+  background: var(--danger);
+}
