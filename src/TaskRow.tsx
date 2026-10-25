@@ -1,5 +1,4 @@
 import { Show, type JSX } from "solid-js";
-import { RotateCw } from "lucide-solid";
 import { Button, CheckButton } from "./ui";
 import {
   container,
@@ -11,7 +10,6 @@ import {
   type Entity,
 } from "./model";
 import {
-  isDueToday,
   isSomeday,
   ProjectProgress,
   TaskDeadline,
@@ -22,6 +20,7 @@ export default function TaskRow(props: {
   item: Entity;
   all: Entity[];
   selected: boolean;
+  isNew?: boolean;
   name?: string;
   showContainer: boolean;
   dropEdge?: "before" | "after";
@@ -42,7 +41,7 @@ export default function TaskRow(props: {
       role="listitem"
       aria-current={props.selected ? "true" : undefined}
       tabindex="0"
-      class="task-row group/task relative grid min-h-10 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-1.5 outline-none transition-colors hover:bg-hover compact:min-h-9 [&.selected]:bg-mint/10 [&.selected:has(+.selected)]:rounded-b-none [&.selected+.selected]:rounded-t-none [&.logged]:grid-cols-[--spacing(7)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-6 [&.heading]:mb-2 [&.heading]:flex [&.heading]:bg-transparent [&.heading]:py-2 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-0 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
+      class="task-row group/task relative -mx-3 grid min-h-10 grid-cols-[--spacing(4)_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-1.5 outline-none transition-colors hover:bg-hover compact:min-h-9 [&.selected]:bg-mint/10 [&.selected:has(+.selected)]:rounded-b-none [&.selected+.selected]:rounded-t-none [&.logged]:grid-cols-[--spacing(4)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-6 [&.heading]:mb-2 [&.heading]:flex [&.heading]:py-2 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-3 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
       classList={{
         selected: props.selected,
         completed: props.item.props.ss === 3,
@@ -86,47 +85,47 @@ export default function TaskRow(props: {
     >
       <Show when={!isHeading(props.item)}>
         <Show
-          when={!isTemplate(props.item)}
+          when={isProject(props.item) && !props.item.props.ss}
           fallback={
-            <RotateCw
-              size={16}
-              class="justify-self-center text-upcoming"
-              aria-label="Repeating template"
+            <CheckButton
+              checked={!!props.item.props.ss}
+              canceled={props.item.props.ss === 2}
+              dashed={isSomeday(props.item)}
+              class={
+                isProject(props.item)
+                  ? "text-project hover:bg-project/10"
+                  : undefined
+              }
+              aria-label={
+                isTemplate(props.item)
+                  ? `Edit repeating ${title(props.item)}`
+                  : `${props.item.props.ss ? "Reopen" : "Complete"} ${title(props.item)}`
+              }
+              aria-description={
+                isTemplate(props.item)
+                  ? "Repeating template; open the to-do to edit its rule"
+                  : undefined
+              }
+              onClick={(e) => {
+                e.stopPropagation();
+                isTemplate(props.item)
+                  ? props.open(e)
+                  : props.complete(e.altKey);
+              }}
             />
           }
         >
-          <Show
-            when={isProject(props.item) && !props.item.props.ss}
-            fallback={
-              <CheckButton
-                checked={!!props.item.props.ss}
-                canceled={props.item.props.ss === 2}
-                dashed={isSomeday(props.item)}
-                class={
-                  isProject(props.item)
-                    ? "text-project hover:bg-project/10"
-                    : undefined
-                }
-                aria-label={`${props.item.props.ss ? "Reopen" : "Complete"} ${title(props.item)}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.complete(e.altKey);
-                }}
-              />
-            }
+          <Button
+            variant="bare"
+            class="task-check project grid size-4 min-h-4 place-items-center justify-self-center rounded-full p-0"
+            aria-label={`Complete ${title(props.item)}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.complete(e.altKey);
+            }}
           >
-            <Button
-              variant="bare"
-              class="task-check project grid size-4 min-h-4 place-items-center justify-self-center rounded-full p-0"
-              aria-label={`Complete ${title(props.item)}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                props.complete(e.altKey);
-              }}
-            >
-              <ProjectProgress project={props.item} all={props.all} />
-            </Button>
-          </Show>
+            <ProjectProgress project={props.item} all={props.all} />
+          </Button>
         </Show>
       </Show>
       <Show when={props.item.props.ss}>
@@ -144,11 +143,11 @@ export default function TaskRow(props: {
       </Show>
       <div class="task-content flex min-w-0 flex-col group-[.heading]/task:flex-1">
         <div class="task-summary flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <Show when={isDueToday(props.item) && !isHeading(props.item)}>
+          <Show when={props.isNew && !isHeading(props.item)}>
             <span
               class="due-today size-2 shrink-0 rounded-full bg-highlight"
-              title="Scheduled for today"
-              aria-label="Due today"
+              title="New in Today"
+              aria-label="New in Today"
             />
           </Show>
           <span class="task-title min-w-0 shrink truncate text-sm leading-6 group-[.heading]/task:text-base group-[.heading]/task:font-semibold group-[.heading]/task:text-accent group-[.completed]/task:text-muted group-[.cancelled]/task:text-quiet group-[.cancelled]/task:line-through">

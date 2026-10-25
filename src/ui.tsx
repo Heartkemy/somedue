@@ -8,4 +8,5 @@ export { Select } from "./ui/Select";
 export { Menu, MenuItem, MenuDivider, MenuPopup, MenuSubmenu } from "./ui/Menu";
 export { FeedbackContext } from "./ui/Feedback";
 export { Input, Textarea } from "./ui/Input";
-export { Kbd, SectionHeading } from "./ui/Typography";
+export { Kbd, SectionHeading, ListHeading } from "./ui/Typography";
+export { NavigationItem } from "./ui/NavigationItem";

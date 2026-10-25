@@ -26,7 +26,6 @@ import {
   Trash2,
   Plus,
   Search,
-  Settings,
   ChevronDown,
   ChevronRight,
   Check,
@@ -34,7 +33,8 @@ import {
   RotateCw,
   MoreHorizontal,
   RefreshCw,
-  Moon,
+  Pause,
+  Play,
   Folder,
   X,
   Box,
@@ -47,7 +47,8 @@ import SettingsPage from "./SettingsPage";
 import TaskMenu, { type TaskAction } from "./TaskMenu";
 import {
   AreaIcon,
-  isDueToday,
+  EveningIcon,
+  SettingsIcon,
   isSomeday,
   ProjectProgress as ProjectProgressIcon,
   ListIcon,
@@ -64,6 +65,8 @@ import {
   ActionBar,
   Dialog,
   Field,
+  ListHeading,
+  NavigationItem,
   FeedbackContext,
   Menu,
   MenuItem,
@@ -310,12 +313,6 @@ export default function App() {
     ]);
     setState(next);
   }
-  const visibleNewTasks = () =>
-    items().filter(
-      (item) =>
-        newTasks().includes(item.id) ||
-        (list() === "Today" && newToday().includes(item.id)),
-    );
   function taskAction(action: TaskAction) {
     const item = chosen();
     if (!item) return;
@@ -632,6 +629,20 @@ export default function App() {
       upcomingCalendar(),
     ),
   );
+  const visibleNewTasks = createMemo(() => {
+    const ids = new Set([
+      ...newTasks(),
+      ...(list() === "Today" ? newToday() : []),
+    ]);
+    return items().filter((item) => ids.has(item.id));
+  });
+  const newTodayIds = createMemo(
+    () =>
+      new Set(
+        list() === "Today" ? visibleNewTasks().map((item) => item.id) : [],
+      ),
+  );
+  const isNewToday = (id: string) => newTodayIds().has(id);
   const pref = (key: string, fallback: any) =>
     state().preferences[key] ?? fallback;
   createEffect(
@@ -1322,7 +1333,7 @@ export default function App() {
   return (
     <FeedbackContext.Provider value={error}>
       <div
-        class="app relative grid h-dvh grid-rows-[--spacing(14)_minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
+        class="app relative grid h-dvh grid-rows-[minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
         classList={{
           "grid-cols-1": !sidebar(),
           "grid-cols-[var(--sidebar-width)_minmax(0,1fr)]": sidebar(),
@@ -1336,15 +1347,13 @@ export default function App() {
         data-motion={pref("motion", true) ? "on" : "off"}
       >
         <div
-          class="titlebar col-span-full row-start-1 z-2 flex h-14 items-center justify-end self-start pl-22 text-xs tracking-wide text-quiet select-none"
-          style={{
-            "padding-right": `calc(100% - ${sidebar() ? sidebarWidth() : 136}px + 16px)`,
-          }}
+          class="titlebar absolute top-0 left-0 z-10 flex h-10 items-center justify-end self-start pl-22 text-xs tracking-wide text-quiet select-none"
+          style={{ width: `${sidebar() ? sidebarWidth() : 136}px` }}
           data-tauri-drag-region
         ></div>
         <div
           class="sidebar-resizer absolute top-1/2 z-30 grid h-16 w-6 -translate-y-1/2 cursor-col-resize touch-none place-items-center rounded-full outline-none after:h-12 after:w-2 after:rounded-full after:bg-quiet/35 hover:after:bg-quiet/65 focus-visible:after:bg-quiet"
-          style={{ left: `${sidebar() ? sidebarWidth() - 8 : 0}px` }}
+          style={{ left: `${sidebar() ? sidebarWidth() + 4 : 0}px` }}
           role="separator"
           aria-label="Sidebar width"
           aria-orientation="vertical"
@@ -1392,10 +1401,9 @@ export default function App() {
                   {(name, i) => {
                     const Icon = navIcons[i()];
                     return (
-                      <Button
-                        variant="bare"
+                      <NavigationItem
                         aria-label={name}
-                        class="nav-item sidebar-item [&:nth-child(2)]:mt-3.5 [&:nth-child(6)]:mt-3.5 grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink"
+                        class="nav-item [&:nth-child(2)]:mt-3.5 [&:nth-child(6)]:mt-3.5"
                         classList={{ active: list() === name && !query() }}
                         onClick={() => navigate(name)}
                         onDragOver={(e) => e.preventDefault()}
@@ -1449,7 +1457,7 @@ export default function App() {
                             {visible(all(), name).length}
                           </span>
                         </Show>
-                      </Button>
+                      </NavigationItem>
                     );
                   }}
                 </For>
@@ -1477,7 +1485,7 @@ export default function App() {
                       >
                         <Button
                           variant="bare"
-                          class="area-toggle absolute top-0 right-2 z-1 size-7 min-h-7 rounded p-1.5 text-quiet opacity-0 group-hover/area:opacity-100 keyboard-input:group-focus-within/area:opacity-100 hover:bg-transparent hover:text-ink"
+                          class="area-toggle absolute top-0 right-2 z-1 size-8 min-h-8 rounded p-1.5 text-quiet opacity-0 group-hover/area:opacity-100 keyboard-input:group-focus-within/area:opacity-100 hover:bg-transparent hover:text-ink"
                           aria-label={`${collapsed().includes(a.id) ? "Expand" : "Collapse"} ${title(a)}`}
                           aria-expanded={!collapsed().includes(a.id)}
                           onClick={() =>
@@ -1494,9 +1502,8 @@ export default function App() {
                             <ChevronDown size={14} />
                           )}
                         </Button>
-                        <Button
-                          variant="bare"
-                          class="sidebar-item area-link grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink pr-9 font-semibold group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection"
+                        <NavigationItem
+                          class="area-link pr-9 font-semibold group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection"
                           classList={{ active: list() === a.id }}
                           onClick={() => navigate(a.id)}
                           onDragOver={(e) => e.preventDefault()}
@@ -1506,7 +1513,7 @@ export default function App() {
                           <span class="sidebar-label block min-w-0 truncate">
                             {title(a)}
                           </span>
-                        </Button>
+                        </NavigationItem>
                       </div>
                       <Show when={!collapsed().includes(a.id)}>
                         <For
@@ -1532,52 +1539,21 @@ export default function App() {
               </div>
             </div>
             <div class="sidebar-bottom flex h-12 min-h-12 shrink-0 items-center gap-1 border-t border-hover px-4">
-              <Button
-                variant="bare"
-                class="sidebar-new-list min-w-0 gap-1 rounded-full px-1 py-1.5 text-xs text-muted"
+              <NavigationItem
+                class="sidebar-new-list min-w-0 w-auto text-sm"
                 aria-label="New project or area"
                 onClick={() => beginCreate("Project")}
               >
                 <Plus size={16} />
                 <span>New List</span>
-              </Button>
-              <Button
-                variant="bare"
-                class="sync-status ml-auto h-7 min-h-7 w-6 min-w-6 rounded-full p-1"
-                onClick={() =>
-                  state().account === "local"
-                    ? (setSettingsTab("Things Cloud"), openSettings())
-                    : void refresh()
-                }
-                title={
-                  state().lastSync
-                    ? `Last synced ${new Date(state().lastSync!).toLocaleString()}`
-                    : "Connect Things Cloud"
-                }
-              >
-                <span
-                  class="status-dot size-1.5 rounded-full bg-quiet [&.connected]:bg-mint [&.pending]:bg-accent"
-                  classList={{
-                    connected: state().account !== "local",
-                    pending: !!state().pending,
-                  }}
-                />
-                <span class="sidebar-status-text sr-only">
-                  {busy()
-                    ? "Syncing…"
-                    : state().pending
-                      ? `${state().pending} pending edit${state().pending === 1 ? "" : "s"}`
-                      : state().account === "local"
-                        ? "Saved on this Mac"
-                        : "Up to date"}
-                </span>
-              </Button>
+              </NavigationItem>
               <IconButton
                 size="small"
+                class="ml-auto"
                 aria-label="Settings"
                 onClick={() => openSettings()}
               >
-                <Settings size={17} />
+                <SettingsIcon size={17} />
               </IconButton>
             </div>
           </aside>
@@ -1587,7 +1563,7 @@ export default function App() {
           inert={connectionOpen()}
         >
           <svg
-            class="workspace-curves pointer-events-none absolute -top-14 right-0 -z-1 h-56 w-7/8 opacity-30"
+            class="workspace-curves pointer-events-none absolute top-0 right-0 -z-1 h-56 w-7/8 opacity-30"
             viewBox="0 0 1000 220"
             preserveAspectRatio="none"
             fill="none"
@@ -1609,7 +1585,7 @@ export default function App() {
               stroke-width=".45"
             />
           </svg>
-          <div class="top-tools absolute -top-14 right-0 z-10 flex h-14 shrink-0 items-center justify-end gap-2 px-7">
+          <div class="top-tools absolute top-0 right-0 z-10 flex h-14 shrink-0 items-center justify-end gap-2 px-7">
             <IconButton
               size="compact"
               variant="quiet"
@@ -1777,7 +1753,7 @@ export default function App() {
                     setMenu(false);
                   }}
                 >
-                  <Settings size={16} /> Settings… <Kbd>⌘ ,</Kbd>
+                  <SettingsIcon size={16} /> Settings… <Kbd>⌘ ,</Kbd>
                 </MenuItem>
               </Menu>
             </Show>
@@ -1825,12 +1801,12 @@ export default function App() {
             }
           >
             <section
-              class="list-page relative min-h-0 flex-1 overflow-auto scroll-smooth px-11 pt-7 pb-9 max-lg:px-7 max-lg:pb-8 data-[list=Logbook]:[&_.list-group-heading]:mt-6 data-[list=Logbook]:[&_.list-group-heading]:border-b data-[list=Logbook]:[&_.list-group-heading]:border-hover data-[list=Logbook]:[&_.list-group-heading]:pb-2.5 data-[list=Logbook]:[&_.list-group-heading]:text-sm data-[list=Logbook]:[&_.list-group-heading]:font-semibold data-[list=Logbook]:[&_.list-group-heading]:text-ink"
+              class="list-page relative min-h-0 flex-1 overflow-auto px-11 pt-14 pb-9 max-lg:px-7 max-lg:pb-8"
               data-list={list()}
             >
               <header class="page-header relative mb-4.5 pb-4 has-[.header-controls:empty]:[&>.page-divider]:hidden">
-                <div class="heading-line flex items-baseline gap-3 px-3">
-                  <span class="page-symbol flex size-7 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
+                <div class="heading-line flex items-baseline gap-3">
+                  <span class="page-symbol flex h-7 w-4 shrink-0 items-center justify-center self-center text-accent [&>svg]:size-6 [&>svg]:stroke-1 [&>.project-ring]:size-7">
                     {list() === "Inbox" ? (
                       <Inbox />
                     ) : list() === "Today" ? (
@@ -1931,14 +1907,19 @@ export default function App() {
                     class="bg-highlight text-on-highlight hover:bg-highlight/90"
                     onClick={() => {
                       const ids = new Set(
-                        visibleNewTasks().map((item) => item.id),
+                        (list() === "Today"
+                          ? visible(all(), "Today")
+                          : visibleNewTasks()
+                        ).map((item) => item.id),
                       );
-                      setNewTasks((previous) =>
-                        previous.filter((id) => !ids.has(id)),
-                      );
-                      setNewToday((previous) =>
-                        previous.filter((id) => !ids.has(id)),
-                      );
+                      batch(() => {
+                        setNewTasks((previous) =>
+                          previous.filter((id) => !ids.has(id)),
+                        );
+                        setNewToday((previous) =>
+                          previous.filter((id) => !ids.has(id)),
+                        );
+                      });
                     }}
                   >
                     OK
@@ -2071,7 +2052,7 @@ export default function App() {
                         return (
                           <>
                             <Show when={section().day}>
-                              <div class="upcoming-day mt-6 mb-2 flex items-baseline gap-2 border-b border-hover pb-2 text-xs font-medium text-muted first:mt-0">
+                              <ListHeading class="upcoming-day items-baseline gap-2 border-b-0 pb-0 text-sm font-medium text-muted after:h-px after:flex-1 after:bg-hover">
                                 <span class="text-2xl font-semibold leading-none text-ink tabular-nums">
                                   {new Date(section().day! * 1000).getUTCDate()}
                                 </span>
@@ -2085,7 +2066,7 @@ export default function App() {
                                         timeZone: "UTC",
                                       })}
                                 </span>
-                                <span class="ml-auto text-quiet">
+                                <span class="sr-only">
                                   {new Date(
                                     section().day! * 1000,
                                   ).toLocaleDateString("en", {
@@ -2093,7 +2074,7 @@ export default function App() {
                                     timeZone: "UTC",
                                   })}
                                 </span>
-                              </div>
+                              </ListHeading>
                               <Show when={!section().rows.length}>
                                 <div
                                   class="min-h-8"
@@ -2102,8 +2083,15 @@ export default function App() {
                               </Show>
                             </Show>
                             <Show when={section().label}>
-                              <div class="anytime-group-heading mt-6 mb-2 grid grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 border-b border-hover px-3 pb-2 text-sm font-semibold first:mt-0">
-                                <span class="grid place-items-center">
+                              <ListHeading
+                                class="anytime-group-heading"
+                                level={
+                                  section().container?.kind.startsWith("Area")
+                                    ? "area"
+                                    : "project"
+                                }
+                              >
+                                <span class="grid w-4 shrink-0 place-items-center">
                                   <Show
                                     when={section().container}
                                     fallback={
@@ -2122,13 +2110,13 @@ export default function App() {
                                 >
                                   <Button
                                     variant="bare"
-                                    class="min-w-0 truncate text-left"
+                                    class="min-w-0 justify-start truncate text-left"
                                     onClick={() => navigate(section().id)}
                                   >
                                     {section().label}
                                   </Button>
                                 </Show>
-                              </div>
+                              </ListHeading>
                             </Show>
                             <For
                               each={
@@ -2163,16 +2151,15 @@ export default function App() {
                                         )
                                     }
                                   >
-                                    <div class="list-group-heading mt-7 mb-2 flex items-center gap-2 border-b border-hover px-3 pb-2 text-sm leading-5 font-semibold text-ink first:mt-0">
+                                    <ListHeading class="list-group-heading">
                                       {group(item) === "This Evening" && (
-                                        <Moon
-                                          size={16}
+                                        <EveningIcon
+                                          size={18}
                                           class="text-muted"
-                                          fill="currentColor"
                                         />
                                       )}
                                       <span>{group(item)}</span>
-                                    </div>
+                                    </ListHeading>
                                   </Show>
                                   <Show
                                     when={editing() === item.id}
@@ -2181,6 +2168,7 @@ export default function App() {
                                         item={item}
                                         all={all()}
                                         selected={selection().includes(item.id)}
+                                        isNew={isNewToday(item.id)}
                                         name={editorSaves.drafts
                                           .get(item.id)
                                           ?.read()
@@ -2313,7 +2301,8 @@ export default function App() {
                               <Button
                                 size="compact"
                                 variant="quiet"
-                                class="ml-13 mt-1 text-quiet"
+                                align="content"
+                                class="mt-1 text-sm text-muted"
                                 onClick={() =>
                                   setExpandedGroups((ids) =>
                                     ids.includes(section().id)
@@ -2634,17 +2623,21 @@ export default function App() {
   );
   function dropIn(e: DragEvent, target: Entity) {
     e.preventDefault();
+    e.stopPropagation();
     const item = all().find(
       (x) => x.id === e.dataTransfer?.getData("text/plain"),
     );
     if (!item || item.id === target.id || editing()) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
     if (item.kind.startsWith("Area") && target.kind.startsWith("Area"))
-      void run(() => mutate(orderBefore(areas(), item, target)));
+      void run(() => mutate(orderBefore(areas(), item, target, after)));
     else if (isProject(item) && isProject(target)) {
       const scope = projects().filter(
         (p) => refs(p, "ar")[0] === refs(target, "ar")[0] || p.id === item.id,
       );
-      const changes = orderBefore(scope, item, target);
+      const changes = orderBefore(scope, item, target, after);
+      if (!changes[item.id]) return;
       Object.assign(changes[item.id].p, {
         ar: refs(target, "ar"),
         pr: [],
@@ -2659,9 +2652,8 @@ export default function App() {
   }
   function ProjectNav(props: { p: Entity }) {
     return (
-      <Button
-        variant="bare"
-        class="project-nav sidebar-item grid h-7 min-h-7 w-full grid-cols-[--spacing(4)_minmax(0,1fr)_auto] items-center gap-x-1 rounded-lg py-0 pr-3 pl-1 text-left text-sm leading-5 font-normal text-muted [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:justify-self-center [&.active]:bg-selection [&.active]:text-ink"
+      <NavigationItem
+        class="project-nav"
         draggable="true"
         onDragStart={(e) => {
           e.stopPropagation();
@@ -2676,7 +2668,7 @@ export default function App() {
         <span class="sidebar-label block min-w-0 truncate">
           {title(props.p)}
         </span>
-      </Button>
+      </NavigationItem>
     );
   }
   function ProjectProgress(props: { project: Entity }) {
@@ -2687,7 +2679,7 @@ export default function App() {
       visible(all(), list(), "", "", true).filter((item) => !!item.props.ss)
         .length;
     return (
-      <div class="list-visibility mt-7 flex flex-col items-start gap-2 border-t border-hover pt-3 pl-4.5 [&>button]:min-h-7 [&>button]:px-0 [&>button]:text-xs [&>button]:text-muted">
+      <div class="list-visibility mt-7 flex flex-col items-start gap-2 border-t border-hover pt-3 [&>button]:-ml-4 [&>button]:min-h-7 [&>button]:text-sm [&>button]:text-muted">
         <Button
           variant="quiet"
           aria-pressed={!showLater()}
@@ -2779,6 +2771,7 @@ export default function App() {
         all().some((saved) => saved.id === item.id)
       ) {
         discardEditor();
+        if (selected() === item.id) setSelected("");
         return Promise.resolve(true);
       }
       return persistEditor(session, async () => {
@@ -2812,7 +2805,7 @@ export default function App() {
     });
     return (
       <div
-        class="heading inline-heading-editor mt-6 mb-2 flex min-h-12 items-center gap-2 rounded-xl bg-surface px-3 py-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:text-base [&>input]:font-semibold [&>input]:text-accent"
+        class="heading inline-heading-editor -mx-3 mt-6 mb-2 flex min-h-12 items-center gap-2 rounded-xl bg-surface px-3 py-2 [&>input]:flex-1 [&>input]:bg-transparent [&>input]:px-0 [&>input]:py-1 [&>input]:text-base [&>input]:font-semibold [&>input]:text-accent"
         onFocusOut={(event) => {
           if (
             event.relatedTarget instanceof Node &&
@@ -3664,7 +3657,7 @@ export default function App() {
     });
     return (
       <div
-        class="task-editor relative mb-4 flex flex-col gap-2 rounded-xl bg-surface px-3 py-5 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
+        class="task-editor relative -mx-3 mb-4 flex flex-col gap-2 rounded-xl bg-surface px-3 py-5 shadow-xl outline-none [&_[hidden]]:hidden [&_:is(input,textarea,button,summary)]:scroll-my-4"
         data-instant={instant || undefined}
         ref={editor}
         role="group"
@@ -3706,7 +3699,7 @@ export default function App() {
           }
         }}
       >
-        <div class="editor-title grid min-h-7 grid-cols-[--spacing(7)_minmax(0,1fr)] items-center gap-3 [&_input]:min-h-7 [&_input]:h-7 [&_input]:rounded-none [&_input]:px-0 [&_input]:py-0 [&_input]:text-sm [&_input]:font-normal [&_input]:focus-visible:bg-transparent [&_input]:focus-visible:shadow-none">
+        <div class="editor-title grid min-h-7 grid-cols-[--spacing(4)_minmax(0,1fr)] items-center gap-3 [&_input]:min-h-7 [&_input]:h-7 [&_input]:rounded-none [&_input]:px-0 [&_input]:py-0 [&_input]:text-sm [&_input]:font-normal [&_input]:focus-visible:bg-transparent [&_input]:focus-visible:shadow-none">
           <Show
             when={!isTemplate(item)}
             fallback={
@@ -3726,10 +3719,10 @@ export default function App() {
             />
           </Show>
           <div class="flex min-w-0 items-center gap-2">
-            <Show when={isDueToday(item)}>
+            <Show when={isNewToday(item.id)}>
               <span
                 class="due-today size-2 shrink-0 rounded-full bg-highlight"
-                aria-label="Due today"
+                aria-label="New in Today"
               />
             </Show>
             <Input
@@ -3742,7 +3735,7 @@ export default function App() {
             />
           </div>
         </div>
-        <div class="editor-notes-block ml-10 min-w-0">
+        <div class="editor-notes-block ml-7 min-w-0">
           <Show
             when={previewNotes()}
             fallback={
@@ -3761,7 +3754,7 @@ export default function App() {
           </Show>
         </div>
         <div
-          class="checklist ml-10 flex flex-col gap-1.5"
+          class="checklist ml-7 flex flex-col gap-1.5"
           hidden={!checks().length}
         >
           <For each={checks()}>
@@ -3849,14 +3842,15 @@ export default function App() {
           <Button
             size="small"
             variant="quiet"
-            class="add-check justify-start self-start gap-2.5 px-0 py-1.5 [&>svg]:w-4.5"
+            align="content"
+            class="add-check justify-start self-start gap-2.5 py-1.5 [&>svg]:w-4.5"
             onClick={() => addCheck()}
           >
             <Plus size={13} />
             Checklist item
           </Button>
         </div>
-        <div class="editor-tools ml-10 mt-3 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.schedule-chip:first-child]:mr-auto [&>.schedule-chip:first-child_.date-picker>button]:px-0">
+        <div class="editor-tools ml-7 mt-3 flex flex-wrap items-center gap-1 [&>*]:min-w-0 [&>.schedule-chip:first-child]:mr-auto">
           <DatePicker
             compact
             clearable
@@ -3895,7 +3889,7 @@ export default function App() {
           />
         </div>
         <Show when={recurring() || repeatRule()}>
-          <div class="repeat-panel ml-10 mt-2 text-sm">
+          <div class="repeat-panel ml-7 mt-2 text-sm">
             <Popover
               label="Repeating schedule"
               size="compact"
@@ -3949,6 +3943,10 @@ export default function App() {
                     <RotateCw size={16} />
                     Edit Rule…
                   </MenuItem>
+                  <hr
+                    role="separator"
+                    class="mx-2 my-1 border-0 border-t border-quiet/20"
+                  />
                   <MenuItem
                     disabled={
                       !recurring() ||
@@ -4007,6 +4005,10 @@ export default function App() {
                     <Search size={16} />
                     Show Previous Copy
                   </MenuItem>
+                  <hr
+                    role="separator"
+                    class="mx-2 my-1 border-0 border-t border-quiet/20"
+                  />
                   <MenuItem
                     disabled={!recurring()}
                     onClick={() => {
@@ -4021,7 +4023,12 @@ export default function App() {
                       });
                     }}
                   >
-                    <Moon size={16} />
+                    <Show
+                      when={recurring()?.props.icp}
+                      fallback={<Pause size={16} />}
+                    >
+                      <Play size={16} />
+                    </Show>
                     {recurring()?.props.icp ? "Resume" : "Pause"}
                   </MenuItem>
                   <MenuItem

@@ -9,7 +9,6 @@ import {
   Inbox,
   Layers,
   ListChecks,
-  Moon,
   RotateCw,
   Star,
   Tag,
@@ -38,7 +37,7 @@ export function ListIcon(props: { name: string; size?: number }) {
     Someday: Archive,
     Logbook: BookOpen,
     Trash: Trash2,
-    "This Evening": Moon,
+    "This Evening": EveningIcon,
   };
   const colors: Record<string, string> = {
     Today: "text-accent",
@@ -101,7 +100,7 @@ export const isDueToday = (item: Entity) =>
 export function AreaIcon(props: { stacked?: boolean }) {
   return (
     <svg
-      class="area-icon size-4 shrink-0 text-muted"
+      class="area-icon size-4.5 shrink-0 text-mint"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -113,6 +112,42 @@ export function AreaIcon(props: { stacked?: boolean }) {
       <Show when={props.stacked}>
         <path d="m4 11 8 4 8-4 M4 15l8 4 8-4" />
       </Show>
+    </svg>
+  );
+}
+
+export function EveningIcon(props: { size?: number; class?: string }) {
+  return (
+    <svg
+      width={props.size || 16}
+      height={props.size || 16}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      class={props.class}
+      aria-hidden="true"
+    >
+      <path d="M20.5 13.3A8.5 8.5 0 0 1 10.7 3.5a8.5 8.5 0 1 0 9.8 9.8Z" />
+    </svg>
+  );
+}
+
+export function SettingsIcon(props: { size?: number }) {
+  // Same settings glyph as Samlad's options menu.
+  return (
+    <svg
+      class="settings-icon"
+      width={props.size || 16}
+      height={props.size || 16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      aria-hidden="true"
+    >
+      <path d="M3 7h7m4 0h7M3 17h11m4 0h3" />
+      <circle cx="12" cy="7" r="2" />
+      <circle cx="16" cy="17" r="2" />
     </svg>
   );
 }
@@ -173,8 +208,13 @@ export function TaskMetadata(props: { item: Entity; all: Entity[] }) {
             props.item.props.rp
           }
         >
-          <span title="Repeating">
-            <RotateCw size={14} />
+          <span
+            title="Repeating"
+            aria-label={
+              isTemplate(props.item) ? "Repeating template" : "Repeating"
+            }
+          >
+            <RotateCw size={14} class="text-upcoming" />
           </span>
         </Show>
         <Show when={isProject(props.item)}>

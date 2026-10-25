@@ -5,6 +5,7 @@ export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: "regular" | "small" | "compact";
   variant?: "primary" | "secondary" | "quiet" | "danger" | "bare";
   iconOnly?: boolean;
+  align?: "content";
 };
 
 const sizes = {
@@ -34,6 +35,7 @@ export function Button(props: ButtonProps) {
     "size",
     "variant",
     "iconOnly",
+    "align",
     "onClick",
     "classList",
   ]);
@@ -60,6 +62,8 @@ export function Button(props: ButtonProps) {
             ? "bare-button"
             : `control-button ${sizes[size()]}`,
         variants[variant()],
+        local.align === "content" &&
+          { regular: "-ml-4", small: "-ml-3", compact: "-ml-2" }[size()],
         local.class,
       )}
       classList={local.classList}

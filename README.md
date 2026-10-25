@@ -104,6 +104,8 @@ Import shared controls from `src/ui.tsx`; their implementations live in `src/ui/
 `Button` and `IconButton` own their size and variant styles. `Input` and `Textarea`
 offer a `plain` variant for writing surfaces. Their `class` props use
 `tailwind-merge`, so caller utilities can override defaults without CSS overrides.
+Use `Button align="content"` to align its contents while preserving hover padding.
+`NavigationItem` and `ListHeading` share navigation geometry and list hierarchy.
 Use `Field`, `Dialog`, `Select`, `Menu`, `Checkbox`, `Kbd`, and `SectionHeading`
 for the corresponding shared UI patterns.
 
@@ -121,6 +123,7 @@ bun run build          # TypeScript check and production frontend build
 bun test tests         # Model, motion, and editor-save tests
 bun run test:native    # Rust tests; requires cached Cargo dependencies
 bun test scripts/app-icon.test.mjs
+bun run test:ui:docker # Chromium and WebKit checks in the matching Playwright image
 ```
 
 The native test runner and packaging script use

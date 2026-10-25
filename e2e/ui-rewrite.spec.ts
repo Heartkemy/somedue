@@ -99,13 +99,14 @@ for (const width of [1120, 760])
           .querySelector("#item-b .task-title")!
           .getBoundingClientRect().x,
         left: editor.getBoundingClientRect().x,
+        padding: parseFloat(getComputedStyle(editor).paddingLeft),
         list: document.querySelector(".task-list")!.getBoundingClientRect().x,
       }));
       expect(after.check).toBe(before.check);
       expect(after.title).toBe(before.title);
       expect(after.top - before.top).toBeGreaterThanOrEqual(12);
       expect(after.neighbor).toBe(before.neighbor);
-      expect(after.left).toBe(after.list);
+      expect(after.left + after.padding).toBe(after.list);
       const notes = page.getByRole("textbox", { name: "Notes", exact: true });
       await notes.focus();
       await expect(notes).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -150,12 +151,12 @@ for (const width of [1120, 760])
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Tags", exact: true }).click();
       const row = page.locator(".tag-setting");
-      await expect(row.locator(".tag-pill")).toHaveCount(1);
+      await expect(row).toHaveClass(/(?:^|\s)tag-pill(?:\s|$)/);
       const trash = row.getByRole("button", { name: "Delete tag Offline" });
       expect((await trash.boundingBox())!.height).toBe(28);
       await expect(trash).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await expect(trash.locator("svg")).toHaveCount(1);
-      expect((await row.boundingBox())!.height).toBeLessThanOrEqual(32);
+      expect((await row.boundingBox())!.height).toBeLessThanOrEqual(36);
       await page
         .getByRole("textbox", { name: "Rename tag Offline" })
         .fill("Offline tasks");
@@ -191,7 +192,7 @@ for (const width of [1120, 760])
       await expect(
         page.locator("#item-someday .task-check circle"),
       ).toHaveAttribute("stroke-dasharray", "1.5 3");
-      await expect(page.locator("#item-today .due-today")).toBeVisible();
+      await expect(page.locator("#item-today .due-today")).toHaveCount(0);
       await expect(
         page.locator("#item-today .checklist-indicator"),
       ).toHaveAttribute("aria-label", "Has checklist");

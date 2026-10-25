@@ -121,7 +121,7 @@ for (const theme of ["dark", "light"])
         await expect(
           page.locator("#item-template [aria-label='Repeating template']"),
         ).toBeVisible();
-        await expect(page.locator("#item-template .task-check")).toHaveCount(0);
+        await expect(page.locator("#item-template .task-check")).toHaveCount(1);
         await page.screenshot({
           path: info.outputPath("upcoming-calendar.png"),
           animations: "disabled",

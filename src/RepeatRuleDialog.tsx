@@ -111,10 +111,12 @@ export default function RepeatRuleDialog(props: {
                 }}
               >
                 <option value="completion">After completion</option>
-                <option value="16">Daily</option>
-                <option value="256">Weekly</option>
-                <option value="8">Monthly</option>
-                <option value="4">Yearly</option>
+                <optgroup label="On a schedule">
+                  <option value="16">Daily</option>
+                  <option value="256">Weekly</option>
+                  <option value="8">Monthly</option>
+                  <option value="4">Yearly</option>
+                </optgroup>
               </Select>
             </div>
           </div>

@@ -6,7 +6,7 @@ import {
   Plus,
   RefreshCw,
   Tag,
-  Trash2,
+  X,
 } from "lucide-solid";
 import {
   Button,
@@ -99,7 +99,7 @@ export default function SettingsPage(props: {
   return (
     <section
       ref={panel}
-      class="settings-panel min-h-0 flex-1 overflow-auto overscroll-contain px-11 pt-7 pb-12 max-lg:px-7"
+      class="settings-panel min-h-0 flex-1 overflow-auto overscroll-contain px-11 pt-14 pb-12 max-lg:px-7"
       aria-labelledby="settings-title"
     >
       <nav
@@ -132,7 +132,7 @@ export default function SettingsPage(props: {
       <div class="settings-layout grid min-h-0 grid-cols-[--spacing(48)_minmax(0,1fr)] items-start gap-8 max-lg:grid-cols-1 max-lg:gap-6">
         <nav
           aria-label="Settings categories"
-          class="settings-navigation sticky top-0 flex flex-col gap-2 border-r border-quiet/15 bg-bg pr-4 max-lg:z-1 max-lg:flex-row max-lg:gap-3 max-lg:overflow-x-auto max-lg:border-r-0 max-lg:border-b max-lg:pr-0 max-lg:pb-2 [&>button]:relative [&>button]:min-h-12 [&>button]:justify-start [&>button]:rounded-none [&>button]:bg-transparent [&>button]:px-0 [&>button]:py-3 [&>button]:text-left [&>button]:text-sm [&>button]:font-normal [&>button]:text-muted [&>button.active]:text-ink [&>button.active]:after:absolute [&>button.active]:after:bottom-0 [&>button.active]:after:left-0 [&>button.active]:after:h-0.5 [&>button.active]:after:w-5 [&>button.active]:after:bg-accent [&>button.active]:after:content-['']"
+          class="settings-navigation sticky top-0 flex flex-col gap-2 border-r border-quiet/15 bg-bg pr-4 max-lg:z-1 max-lg:flex-row max-lg:gap-3 max-lg:overflow-x-auto max-lg:border-r-0 max-lg:border-b max-lg:pr-0 max-lg:pb-2 [&>button]:relative [&>button]:min-h-12 [&>button]:justify-start [&>button]:rounded-lg [&>button]:bg-transparent [&>button]:px-3 [&>button]:py-3 [&>button]:text-left [&>button]:text-sm [&>button]:font-normal [&>button]:text-muted [&>button.active]:text-ink [&>button.active]:after:absolute [&>button.active]:after:bottom-0 [&>button.active]:after:left-3 [&>button.active]:after:h-0.5 [&>button.active]:after:w-5 [&>button.active]:after:bg-accent [&>button.active]:after:content-['']"
         >
           <For
             each={[
@@ -388,52 +388,53 @@ export default function SettingsPage(props: {
                 <Plus size={18} />
               </IconButton>
             </form>
-            <For each={tags()}>
-              {(t) => (
-                <div class="tag-setting mb-2 flex min-h-8 items-center gap-2 text-muted">
-                  <Pill class="min-w-0 flex-1 justify-start">
+            <div class="tag-settings flex flex-wrap items-start gap-2">
+              <For each={tags()}>
+                {(t) => (
+                  <Pill class="tag-setting min-h-9 max-w-full justify-start gap-2 pr-1">
                     <Tag size={14} />
                     <Input
                       variant="plain"
-                      class="h-6 min-h-6 w-0 flex-1 px-0 py-0 text-xs"
+                      class="h-6 min-h-6 w-auto min-w-4 max-w-48 px-0 py-0 text-xs field-sizing-content"
+                      size={Math.max(1, title(t).length)}
                       aria-label={`Rename tag ${title(t)}`}
                       value={title(t)}
                       onChange={(e) =>
                         void patch(t, { tt: e.currentTarget.value })
                       }
                     />
+                    <IconButton
+                      size="compact"
+                      variant="quiet"
+                      class="bg-transparent hover:bg-transparent text-quiet hover:text-danger"
+                      aria-label={`Delete tag ${title(t)}`}
+                      onClick={() =>
+                        ask(
+                          `Delete the tag “${title(t)}” from all items?`,
+                          async () => {
+                            const changes: Changes = {
+                              [t.id]: { e: t.kind, t: 2, p: {} },
+                            };
+                            for (const e of all().filter((x) =>
+                              refs(x, "tg").includes(t.id),
+                            ))
+                              Object.assign(
+                                changes,
+                                event(e, {
+                                  tg: refs(e, "tg").filter((id) => id !== t.id),
+                                }),
+                              );
+                            await mutate(changes, true);
+                          },
+                        )
+                      }
+                    >
+                      <X size={14} />
+                    </IconButton>
                   </Pill>
-                  <IconButton
-                    size="compact"
-                    variant="quiet"
-                    class="bg-transparent hover:bg-transparent text-quiet hover:text-danger"
-                    aria-label={`Delete tag ${title(t)}`}
-                    onClick={() =>
-                      ask(
-                        `Delete the tag “${title(t)}” from all items?`,
-                        async () => {
-                          const changes: Changes = {
-                            [t.id]: { e: t.kind, t: 2, p: {} },
-                          };
-                          for (const e of all().filter((x) =>
-                            refs(x, "tg").includes(t.id),
-                          ))
-                            Object.assign(
-                              changes,
-                              event(e, {
-                                tg: refs(e, "tg").filter((id) => id !== t.id),
-                              }),
-                            );
-                          await mutate(changes, true);
-                        },
-                      )
-                    }
-                  >
-                    <Trash2 size={14} />
-                  </IconButton>
-                </div>
-              )}
-            </For>
+                )}
+              </For>
+            </div>
           </Show>
           <Show when={settingsTab() === "Keyboard"}>
             <SectionHeading>Keyboard</SectionHeading>

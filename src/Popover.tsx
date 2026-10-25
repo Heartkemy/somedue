@@ -1,6 +1,7 @@
 import {
   createSignal,
   createUniqueId,
+  Show,
   onMount,
   onCleanup,
   type JSX,
@@ -89,11 +90,13 @@ export function Popover(props: {
           }
         }}
       >
-        <div
-          class={`control-popover-body grid min-w-0 gap-2 p-2.5 has-[>.ui-menu]:gap-0 has-[>.ui-menu]:p-2 ${props.bodyClass || ""}`}
-        >
-          {props.children(close)}
-        </div>
+        <Show when={opened()}>
+          <div
+            class={`control-popover-body grid min-w-0 gap-2 p-2.5 has-[>.ui-menu]:gap-0 has-[>.ui-menu]:p-2 ${props.bodyClass || ""}`}
+          >
+            {props.children(close)}
+          </div>
+        </Show>
       </div>
     </div>
   );

@@ -76,7 +76,7 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
           {(d) => (
             <Button
               variant="bare"
-              class="calendar-day min-h-7 min-w-0 w-full rounded-full p-0 text-xs [&.outside]:text-quiet [&.today]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1"
+              class="calendar-day min-h-7 min-w-0 w-full rounded-full p-0 text-xs [&.outside:not(.chosen)]:text-quiet [&.today:not(.chosen)]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1"
               data-date={iso(d)}
               aria-label={d.toLocaleDateString("en", {
                 weekday: "long",
@@ -192,15 +192,16 @@ export default function DatePicker(props: {
             timeZone: "UTC",
           })
         : "Deadline";
+  const hasSurface = () =>
+    !!props.clearable &&
+    (props.kind === "deadline"
+      ? !!props.value
+      : !!props.mode && props.mode !== "Inbox");
   return (
     <div
-      class="schedule-chip flex min-w-0 items-center rounded-md"
+      class="schedule-chip flex min-w-0 items-center rounded-md transition-colors"
       classList={{
-        "bg-hover":
-          !!props.clearable &&
-          (props.kind === "deadline"
-            ? !!props.value
-            : !!props.mode && props.mode !== "Inbox"),
+        "bg-hover hover:bg-ink/10": hasSurface(),
       }}
     >
       <Popover
@@ -208,7 +209,9 @@ export default function DatePicker(props: {
         triggerClass={
           props.iconOnly
             ? "bg-transparent hover:bg-transparent text-quiet hover:text-ink"
-            : undefined
+            : hasSurface()
+              ? "bg-transparent hover:bg-transparent"
+              : undefined
         }
         size={props.compact ? "compact" : "small"}
         iconOnly={props.iconOnly}
@@ -220,6 +223,7 @@ export default function DatePicker(props: {
               <Show
                 when={
                   props.mode &&
+                  !props.iconOnly &&
                   [
                     "Today",
                     "This Evening",
@@ -316,7 +320,7 @@ export default function DatePicker(props: {
                 <Show when={props.value || props.kind === "when"}>
                   <Button
                     size="small"
-                    class="justify-start px-2"
+                    class="justify-start"
                     onClick={() => {
                       props.change(
                         "",
@@ -332,7 +336,13 @@ export default function DatePicker(props: {
                 </Show>
               </div>
               <Calendar
-                value={props.value}
+                value={
+                  props.value ||
+                  (props.kind === "when" &&
+                  ["Today", "This Evening"].includes(props.mode || "")
+                    ? date(today())
+                    : "")
+                }
                 choose={(value) => {
                   props.change(value, "Date");
                   close();
@@ -385,7 +395,7 @@ export default function DatePicker(props: {
         <IconButton
           size="compact"
           variant="quiet"
-          class="rounded-full p-1"
+          class="rounded-md bg-transparent hover:bg-transparent active:scale-100"
           aria-label={
             props.kind === "when" ? "Remove schedule" : "Remove deadline"
           }

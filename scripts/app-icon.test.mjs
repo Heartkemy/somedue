@@ -8,6 +8,9 @@ test('bundle icons reproduce the supplied Somedue artwork at every required size
   const { data, info } = await sharp(path.join(root, 'src-tauri/icons/icon.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   assert.equal(info.width, 1024);
   assert.equal(info.height, 1024);
+  for (const [x, y] of [[0, 0], [512, 0], [0, 512], [1023, 1023]]) {
+    assert.equal(data[(y * info.width + x) * 4 + 3], 0, 'macOS icon corners and outer inset must stay transparent');
+  }
   const source = await sharp(path.join(root, 'assets/icon/app.svg')).resize(1024, 1024).ensureAlpha().raw().toBuffer();
   assert.deepEqual(data, source, 'generated artwork must match the supplied SVG');
   for (const size of [32, 128, 256, 512, 1024]) {
