@@ -24,6 +24,24 @@ service is `io.somedue.desktop.things-cloud.v1`; its signed helper uses
 
 Local build and installed-Keychain receipts are under ignored `out/`.
 
+## Dependency triage — 2026-10-26
+
+- Sharp is pinned at 0.35.5. The three current GitHub advisories name 0.35.0,
+  0.35.4, and 0.35.5 as their first patched releases:
+  [GHSA-f88m-g3jw-g9cj](https://github.com/advisories/GHSA-f88m-g3jw-g9cj),
+  [GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c),
+  and [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
+- `cargo tree` resolves no path to `glib 0.18.5` or `proc-macro-error 1.0.4`
+  for either `aarch64-apple-darwin` or `x86_64-apple-darwin`; the all-target
+  paths run through GTK/WebKit dependencies instead. The `glib` advisory
+  ([RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html),
+  last modified 2025-10-28) affects 0.15.0 through before 0.20.0. The
+  `proc-macro-error` entry
+  ([RUSTSEC-2024-0370](https://rustsec.org/advisories/RUSTSEC-2024-0370.html),
+  last modified 2026-06-07) is an unmaintained notice with no patched release.
+- Those are narrow macOS-target exceptions, not a claim that the overall
+  dependency graph is vulnerability-free.
+
 ## Limits
 
 This rename did not repeat the complete browser interaction suite or live Cloud
