@@ -15,6 +15,10 @@ and breaking changes. Features and data formats may change without migration sup
 Somedue is an independent, open-source project and is not affiliated with or
 endorsed by Cultured Code, the makers of Things.
 
+![Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned.](docs/screenshots/today.png)
+
+*Today, with fictional tasks. All screenshots are browser previews with synthetic data.*
+
 ## What it does
 
 - **Plan your day:** Inbox, Today, Upcoming, Anytime, Someday, Logbook, and Trash.
@@ -29,6 +33,18 @@ endorsed by Cultured Code, the makers of Things.
 Click a to-do to select it. Press Enter or double-click to edit it; click empty
 space to clear the selection. Drag checklist items by their right-hand handles,
 or use Option ↑ / ↓ while editing an item.
+
+### Projects and details
+
+Keep a project in small steps, with notes and a checklist when you need them.
+
+![A windowsill garden project in the dark theme, with headings, notes, and an open task checklist.](docs/screenshots/project.png)
+
+### Plan ahead
+
+Upcoming gives scheduled tasks a place in the days ahead.
+
+![Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week.](docs/screenshots/upcoming.png)
 
 ## Current limitations
 
@@ -151,6 +167,11 @@ classes such as `task-row` also serve as behavior/test hooks. Measured sidebar
 widths and viewport-aware popup positions remain runtime values.
 
 ### Checks
+
+To refresh the README screenshots, run `bun run screenshots` with Docker running.
+The capture uses a fixed date and isolated, fictional tasks from
+[`tests/browser/readme-screenshots.ts`](tests/browser/readme-screenshots.ts).
+Review the generated PNGs in `docs/screenshots/` after visible UI changes.
 
 ```sh
 bun run build          # TypeScript check and production frontend build
