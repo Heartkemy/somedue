@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/today.png" alt="Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned." />
+  <img src="docs/screenshots/today.png" alt="Today in Somedue's dark theme, with project progress, tagged tasks, deadlines, and a quiet evening planned." />
 </p>
 
 <p align="center">
@@ -57,10 +57,11 @@ or use Option ↑ / ↓ while editing an item.
 
 ### Projects and details
 
-Keep a project in small steps, with notes and a checklist when you need them.
+Follow a project already in motion, with progress rings, headings, notes, tags,
+and a partly completed checklist.
 
 <p align="center">
-  <img src="docs/screenshots/project.png" alt="A windowsill garden project in the dark theme, with headings, notes, and an open task checklist." />
+  <img src="docs/screenshots/project.png" alt="A windowsill garden project at 43% completion, with headings, notes, tags, a deadline, and two of three checklist steps complete." />
 </p>
 
 ### Plan ahead
@@ -68,7 +69,7 @@ Keep a project in small steps, with notes and a checklist when you need them.
 Upcoming gives scheduled tasks a place in the days ahead.
 
 <p align="center">
-  <img src="docs/screenshots/upcoming.png" alt="Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week." />
+  <img src="docs/screenshots/upcoming.png" alt="Upcoming in the dark theme, with gardening, drawing, a book swap, a walking route, and a picnic scheduled across four days." />
 </p>
 
 ### Schedule a task
