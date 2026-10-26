@@ -28,6 +28,7 @@ function artifactFixture({ architecture, notarized = true, payload }) {
       bundleId: "io.somedue.desktop",
       notarized,
       savedCloudCredentials: false,
+      cloudAccess: false,
       signing: notarized ? "Developer ID" : "ad-hoc local build",
       dmg: { path: dmg, sha256: sha256(payload) },
     }),
@@ -45,6 +46,7 @@ test("validates a real DMG against its package receipt", () => {
     filename: "Somedue-0.1.1-arm64.dmg",
     notarized: true,
     savedCloudCredentials: false,
+    cloudAccess: false,
     sha256: sha256("arm-dmg"),
     signing: "Developer ID",
     version: "0.1.1",
@@ -100,7 +102,7 @@ test("refuses a changed artifact at an otherwise valid release URL", async () =>
   );
 });
 
-test("refuses non-notarized or changed artifacts", async () => {
+test("allows ad-hoc local-only previews in a maintainer tap and rejects changed bytes", async () => {
   const arm = artifactFixture({
     architecture: "arm64",
     notarized: false,
@@ -110,6 +112,38 @@ test("refuses non-notarized or changed artifacts", async () => {
     architecture: "x86_64",
     payload: "intel-dmg",
   });
+  const cask = await caskFromReceipts(
+    {
+      armReceipt: arm.receipt,
+      armUrl: "https://downloads.example.test/Somedue-0.1.1-arm64.dmg",
+      intelReceipt: intel.receipt,
+      intelUrl: "https://downloads.example.test/Somedue-0.1.1-x86_64.dmg",
+    },
+    {
+      fetchImpl: async (url) =>
+        new Response(url.includes("arm64") ? arm.payload : intel.payload),
+    },
+  );
+  assert.match(cask, /ad-hoc signed and not notarized/);
+
+  const receipt = JSON.parse(readFileSync(intel.receipt, "utf8"));
+  receipt.dmg.sha256 = sha256("wrong");
+  writeFileSync(intel.receipt, JSON.stringify(receipt));
+  assert.throws(
+    () => validateReceipt(intel.receipt),
+    /checksum does not match/,
+  );
+});
+
+test("refuses Cloud-enabled receipts before downloading a Cask artifact", async () => {
+  const arm = artifactFixture({ architecture: "arm64", payload: "arm-dmg" });
+  const intel = artifactFixture({
+    architecture: "x86_64",
+    payload: "intel-dmg",
+  });
+  const receipt = JSON.parse(readFileSync(arm.receipt, "utf8"));
+  receipt.cloudAccess = true;
+  writeFileSync(arm.receipt, JSON.stringify(receipt));
   await assert.rejects(
     caskFromReceipts(
       {
@@ -118,16 +152,12 @@ test("refuses non-notarized or changed artifacts", async () => {
         intelReceipt: intel.receipt,
         intelUrl: "https://downloads.example.test/Somedue-0.1.1-x86_64.dmg",
       },
-      { fetchImpl: async () => new Response("ignored") },
+      {
+        fetchImpl: async () => {
+          throw new Error("must not fetch");
+        },
+      },
     ),
-    /not notarized/,
-  );
-
-  const receipt = JSON.parse(readFileSync(intel.receipt, "utf8"));
-  receipt.dmg.sha256 = sha256("wrong");
-  writeFileSync(intel.receipt, JSON.stringify(receipt));
-  assert.throws(
-    () => validateReceipt(intel.receipt),
-    /checksum does not match/,
+    /not a verified local-only build/,
   );
 });

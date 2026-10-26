@@ -69,6 +69,7 @@ function receiptArtifact(receiptPath) {
     filename: path.basename(dmgPath),
     notarized: receipt.notarized,
     savedCloudCredentials: receipt.savedCloudCredentials,
+    cloudAccess: receipt.cloudAccess,
     sha256: actualSha256,
     signing: receipt.signing,
     version: match[1],
@@ -129,12 +130,16 @@ function caskText({ arm, intel }) {
   desc "Native macOS task manager"
   homepage "https://github.com/Heartkemy/somedue"
 
+  depends_on macos: ">= :ventura"
+
   app "Somedue.app"
 
   caveats <<~EOS
     Somedue requires macOS 13 or later.
     Homebrew keeps quarantine enabled so macOS can assess the app normally.
     This build does not support saving Things Cloud credentials.
+    Things Cloud connections are disabled in this local-only preview.
+    ${!arm.notarized || !intel.notarized ? "This preview is ad-hoc signed and not notarized. macOS may block opening it.\n    See the repository's installation instructions before choosing to open it." : ""}
   EOS
 end
 `;
@@ -154,14 +159,12 @@ export async function caskFromReceipts(
   if (arm.version !== intel.version)
     throw new Error("Cask artifacts must have the same version.");
   for (const artifact of [arm, intel]) {
-    if (artifact.notarized !== true) {
+    if (
+      artifact.savedCloudCredentials !== false ||
+      artifact.cloudAccess !== false
+    ) {
       throw new Error(
-        `${artifact.architecture} is not notarized and is not eligible for Cask generation.`,
-      );
-    }
-    if (artifact.savedCloudCredentials !== false) {
-      throw new Error(
-        `${artifact.architecture} can save Cloud credentials and is outside this release scope.`,
+        `${artifact.architecture} is not a verified local-only build.`,
       );
     }
   }

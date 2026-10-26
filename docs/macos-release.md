@@ -1,94 +1,67 @@
-# macOS release rehearsal and Cask preparation
+# macOS previews and the maintainer tap
 
-## Current boundary
+Alpha 1 is a local-only preview, signed ad-hoc and not notarized. It cannot
+connect to Things Cloud or save its credentials. Source development builds keep
+the experimental Cloud integration; certificate-signed source builds retain the
+existing Keychain boundary.
 
-The repository can build architecture-specific ad-hoc preview DMGs, but those
-artifacts are not a public release channel. They are not notarized and cannot
-save Things Cloud credentials. Do not publish them, add them to a tap, or claim
-that they install without a Gatekeeper warning.
-
-Homebrew applies macOS quarantine attributes to Cask downloads so Gatekeeper can
-assess them; it does not remove quarantine for users. Homebrew requires
-Gatekeeper-assessable Cask artifacts to pass without disabling or bypassing
-Gatekeeper or System Integrity Protection. See [Homebrew Security and Supply
-Chain](https://docs.brew.sh/Homebrew-Security-and-Supply-Chain#casks-have-a-different-trust-model)
-and [Acceptable Casks](https://docs.brew.sh/Acceptable-Casks#platform-compatibility-and-macos-security-protections).
-
-This repository deliberately contains no `xattr` removal, `--no-quarantine`,
-Gatekeeper bypass, artifact-upload, release, or tap-publishing automation.
-
-## Native release runners
-
-The workflow uses named standard GitHub-hosted runners rather than
-`macos-latest`:
-
-| Artifact      | Runner           | Rust target            |
-| ------------- | ---------------- | ---------------------- |
-| Apple Silicon | `macos-15`       | `aarch64-apple-darwin` |
-| Intel         | `macos-15-intel` | `x86_64-apple-darwin`  |
-
-GitHub currently documents those labels as the arm64 and Intel standard macOS
-runners for public and private repositories. See the [GitHub-hosted runner
-reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
-
-`.github/workflows/macos-release.yml` only runs on a maintainer's manual
-dispatch or a tag. `rehearsal-*` tags exist solely to run the hosted dress
-rehearsal before the workflow reaches the default branch; `v*` tags use the
-same nonpublishing checks. It has read-only contents permission, pins every
-action to a full commit SHA, isolates caches by runner architecture and
-lockfile hashes, has a 30-minute job cap, and never uploads binaries or writes
-to GitHub.
-
-## Local-first checklist
-
-Run this before any hosted rehearsal:
+## Build and verify locally
 
 ```sh
 bun install --frozen-lockfile
 bun run build
-bun test tests/macos-package.test.mjs tests/macos-lipo.test.mjs tests/homebrew-cask.test.mjs tests/macos-release-workflow.test.mjs
+bun test tests
+bun run test:native
 bun run package:macos
 bun scripts/homebrew-cask.mjs \
   --check-receipt out/macos/ad-hoc/arm64/build-receipt.json \
   --check-receipt out/macos/ad-hoc/x86_64/build-receipt.json
 ```
 
-The last command recomputes each local DMG SHA-256 and compares it with its
-receipt. It does not create a Cask and does not alter quarantine attributes.
+Each architecture gets a thin app, a DMG, bundled third-party notices, and a
+receipt under `out/macos/ad-hoc/`. Packaging verifies signatures, architecture,
+notices and mounted-image contents. On the native host it also runs synthetic
+checks proving that both Keychain storage and Cloud access are refused. Receipts
+record source commits and checksums; DMG paths are relative so receipts travel
+with their files. Cross-build inspection is not native Intel or oldest-OS testing.
 
-For the hosted dress rehearsal, manually dispatch the workflow after the local
-checks pass. Before the workflow is on the default branch, push one uniquely
-named `rehearsal-*` tag instead; do not use a release-looking `v*` tag. Inspect
-both native job logs and confirm that no artifact, release, or Cloud-enabled
-binary was published. A tag follows the same nonpublishing path; publishing
-remains a separately authorized release decision.
+## Hosted packages
 
-## Cask generation after an eligible release
+The macOS workflow builds on `macos-15` (Apple Silicon) and `macos-15-intel`
+(Intel), with architecture-specific caches and pinned tools. Manual and
+`rehearsal-*` runs validate without uploading. Version tags also retain per-arch
+DMGs, receipts and notices as Actions artifacts for seven days. Those artifacts
+are separate builds and may have different bytes from locally built packages.
 
-Do not use an ad-hoc receipt to generate a future Cask: a later CI build may
-have different bytes. After a separately authorized, Developer ID-signed,
-notarized, Cloud-credential-disabled release has immutable public URLs, generate
-the Cask from the exact uploaded bytes:
+Publish a prerelease only after the final source and exact intended files are
+verified. Create it as a draft, upload both DMGs, notices and `SHA256SUMS`, verify
+the asset set, then publish. Keep versioned assets immutable. The Alpha 1 tag is
+`v0.1.1-alpha.1`; the app and Cask version is `0.1.1-alpha.1`.
+
+## Maintainer-owned Homebrew Cask
+
+After the exact released files have public URLs, generate a Cask from matching
+receipts. The generator rechecks local and downloaded SHA-256 values and refuses
+artifacts that can access Cloud or save credentials.
 
 ```sh
 bun scripts/homebrew-cask.mjs \
-  --arm-receipt out/macos/release/arm64/build-receipt.json \
-  --arm-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1/Somedue-0.1.1-arm64.dmg \
-  --intel-receipt out/macos/release/x86_64/build-receipt.json \
-  --intel-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1/Somedue-0.1.1-x86_64.dmg \
+  --arm-receipt out/macos/ad-hoc/arm64/build-receipt.json \
+  --arm-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.1/Somedue-0.1.1-alpha.1-arm64.dmg \
+  --intel-receipt out/macos/ad-hoc/x86_64/build-receipt.json \
+  --intel-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.1/Somedue-0.1.1-alpha.1-x86_64.dmg \
   --output out/macos/cask/Casks/somedue.rb
 ```
 
-The generator first verifies the local receipt and DMG, then downloads each
-HTTPS URL and requires its SHA-256 to match before writing the architecture-aware
-Cask. It refuses non-notarized or Cloud-credential-enabled artifacts. This
-prevents placeholder checksums and prevents a Cask from silently referring to
-different bytes.
+The Cask belongs to `Heartkemy/homebrew-somedue`, installed with
+`brew install --cask heartkemy/somedue/somedue`. Verify normal downloaded
+installation and the upgrade transaction in a temporary app directory before
+publishing the tap. Retain quarantine and report the tested architectures and
+OS versions accurately.
 
-Only after that gate, test the Cask in a local checkout of a maintainer-owned
-tap (not `homebrew/cask`): run `brew audit --cask --strict`, install it normally
-with `brew install --cask OWNER/tap/somedue`, and verify the upgrade path with
-`brew upgrade --cask OWNER/tap/somedue`. Test on clean supported Intel and Apple
-Silicon Macs, including the normal Gatekeeper assessment. Official Homebrew Cask
-submission is a later review decision, not an automated consequence of this
-preparation.
+An ad-hoc preview is not eligible for the official `homebrew/cask` repository.
+A personal tap does not make it notarized or warning-free: Homebrew keeps
+quarantine enabled and macOS may block opening it. See [Homebrew's security
+documentation](https://docs.brew.sh/Homebrew-Security-and-Supply-Chain) and
+[Apple's guidance](https://support.apple.com/en-us/102445). This project does not
+remove quarantine, disable Gatekeeper, or buy signing services automatically.
