@@ -7,8 +7,13 @@ const fixture = readFileSync(
   "utf8",
 );
 
-for (const view of ["today", "project", "upcoming"] as const) {
-  test(`capture ${view}`, async ({ page }) => {
+for (const view of [
+  "today",
+  "project",
+  "upcoming",
+  "schedule",
+] as const) {
+  test(`capture ${view}`, async ({ page, context }) => {
     // A fixed clock and isolated IPC keep captures repeatable and free of personal data.
     await page.clock.setFixedTime(new Date("2026-10-26T10:00:00Z"));
     await page.route("**/*", (route) =>
@@ -17,6 +22,10 @@ for (const view of ["today", "project", "upcoming"] as const) {
         : route.abort(),
     );
     await page.goto("/");
+    // Capture-only presentation: keep the real app's browser-preview notice intact.
+    await page.addStyleTag({
+      content: ".preview-note { display: none !important; }",
+    });
     await page.evaluate(fixture);
     await page.evaluate(() => {
       const state = (window as unknown as { __TEST_STATE__: State })
@@ -131,7 +140,7 @@ for (const view of ["today", "project", "upcoming"] as const) {
       .getByRole("button", { name: "OK", exact: true })
       .click();
 
-    if (view === "project") {
+    if (view === "project" || view === "schedule") {
       await page
         .getByRole("button", {
           name: "0% complete Windowsill garden",
@@ -152,6 +161,15 @@ for (const view of ["today", "project", "upcoming"] as const) {
       await page
         .getByRole("textbox", { name: "To-do title" })
         .evaluate((el) => (el as HTMLElement).blur());
+      if (view === "schedule") {
+        await page
+          .locator(".task-editor")
+          .getByRole("button", { name: "When", exact: true })
+          .click();
+        await expect(
+          page.getByRole("dialog", { name: "When", exact: true }),
+        ).toBeVisible();
+      }
     } else {
       if (view === "upcoming") {
         await page
@@ -163,7 +181,7 @@ for (const view of ["today", "project", "upcoming"] as const) {
           .click();
       }
       await expect(
-        page.locator(view === "today" ? "#item-walk" : "#item-swap"),
+        page.locator(view === "upcoming" ? "#item-swap" : "#item-walk"),
       ).toBeVisible();
     }
     await expect(page.locator(".new-todos")).toHaveCount(0);
@@ -173,10 +191,39 @@ for (const view of ["today", "project", "upcoming"] as const) {
     );
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);
-    await page.screenshot({
-      path: `docs/screenshots/${view}.png`,
+    await expect(page.locator(".preview-note")).toBeHidden();
+    const capture = await page.screenshot({
       animations: "disabled",
       caret: "hide",
     });
+
+    // Synthetic macOS chrome belongs to the documentation artifact, not the product.
+    // CSS here is a standalone capture stage; app UI styling stays in Tailwind.
+    const frame = await context.newPage();
+    await frame.setViewportSize({ width: 1280, height: 920 });
+    await frame.setContent(`<!doctype html><html><head><style>
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 32px 40px 48px; }
+      main { position: relative; width: 1200px; height: 840px; overflow: hidden;
+        border-radius: 14px; box-shadow: 0 16px 32px rgb(0 0 0 / 28%); }
+      img { display: block; width: 100%; height: 100%; }
+      nav { position: absolute; top: 16px; left: 20px; display: flex; gap: 8px; }
+      i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+      i:nth-child(2) { background: #febc2e; }
+      i:nth-child(3) { background: #28c840; }
+    </style></head><body><main>
+      <img alt="Somedue ${view}" src="data:image/png;base64,${capture.toString("base64")}" />
+      <nav aria-label="macOS window controls"><i></i><i></i><i></i></nav>
+    </main></body></html>`);
+    await frame
+      .locator("img")
+      .evaluate((img: HTMLImageElement) => img.decode());
+    await expect(frame.locator("nav i")).toHaveCount(3);
+    await frame.screenshot({
+      path: `docs/screenshots/${view}.png`,
+      animations: "disabled",
+      omitBackground: true,
+    });
+    await frame.close();
   });
 }

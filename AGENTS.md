@@ -17,3 +17,8 @@ and visually inspect the results. Use only the dark theme. Keep the synthetic
 fixture in `tests/browser/readme-screenshots.ts` serene, playful, and non-biased; never
 capture personal tasks, credentials, or Things Cloud data. Update README image
 references and captions when the views change.
+
+Keep README images at `width="480"` with their aspect ratio preserved. The capture
+script hides the browser preview notice only while taking screenshots and adds
+synthetic macOS traffic lights, rounded corners, and soft shadows. Preserve this
+presentation when refreshing images; do not change the app for screenshot framing.

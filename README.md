@@ -15,9 +15,9 @@ and breaking changes. Features and data formats may change without migration sup
 Somedue is an independent, open-source project and is not affiliated with or
 endorsed by Cultured Code, the makers of Things.
 
-![Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned.](docs/screenshots/today.png)
+<img src="docs/screenshots/today.png" width="480" alt="Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned." />
 
-*Today, with fictional tasks. All screenshots are browser previews with synthetic data.*
+*Today, with fictional tasks. All screenshots use synthetic data and a decorative macOS window frame.*
 
 ## What it does
 
@@ -38,13 +38,19 @@ or use Option ↑ / ↓ while editing an item.
 
 Keep a project in small steps, with notes and a checklist when you need them.
 
-![A windowsill garden project in the dark theme, with headings, notes, and an open task checklist.](docs/screenshots/project.png)
+<img src="docs/screenshots/project.png" width="480" alt="A windowsill garden project in the dark theme, with headings, notes, and an open task checklist." />
 
 ### Plan ahead
 
 Upcoming gives scheduled tasks a place in the days ahead.
 
-![Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week.](docs/screenshots/upcoming.png)
+<img src="docs/screenshots/upcoming.png" width="480" alt="Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week." />
+
+### Schedule a task
+
+Choose a start date without leaving the task you're editing.
+
+<img src="docs/screenshots/schedule.png" width="480" alt="The scheduling picker open beside a garden task, with Today, This Evening, and calendar choices." />
 
 ## Current limitations
 
@@ -172,6 +178,8 @@ To refresh the README screenshots, run `bun run screenshots` with Docker running
 The capture uses a fixed date and isolated, fictional tasks from
 [`tests/browser/readme-screenshots.ts`](tests/browser/readme-screenshots.ts).
 Review the generated PNGs in `docs/screenshots/` after visible UI changes.
+The capture hides the browser-only preview notice and adds rounded macOS-style
+frames, traffic-light controls, and shadows only to the documentation images.
 
 ```sh
 bun run build          # TypeScript check and production frontend build
