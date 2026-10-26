@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUN_VERSION: 1.4.3
+  BUN_VERSION: 1.4.4
   RUST_VERSION: 1.99.1
   CARGO_TARGET_DIR: ${{ github.workspace }}/.cargo-target
 
