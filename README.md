@@ -93,7 +93,7 @@ app is not notarized. Test it with nonessential data before relying on it.
 
 ## Run from source
 
-You need macOS 13 or later, [Bun 1.4.3](https://bun.sh),
+You need macOS 13 or later, [Bun 1.4.4](https://bun.sh),
 [Rust and Cargo 1.99.1](https://www.rust-lang.org/tools/install), and Apple's Xcode
 Command Line Tools (`xcode-select --install`). These are the versions used in CI.
 
