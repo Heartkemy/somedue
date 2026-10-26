@@ -11,8 +11,8 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
   test(`capture ${view}`, async ({ page, context }) => {
     if (view === "today")
       await page.setViewportSize({ width: 900, height: 560 });
-    if (view === "upcoming")
-      await page.setViewportSize({ width: 900, height: 680 });
+    if (view === "project")
+      await page.setViewportSize({ width: 900, height: 960 });
     // A fixed clock and isolated IPC keep captures repeatable and free of personal data.
     await page.clock.setFixedTime(new Date("2026-10-26T10:00:00Z"));
     await page.route("**/*", (route) =>
@@ -52,10 +52,11 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
         },
         { id: "gentle", kind: "Tag4", props: { tt: "Gentle pace" } },
         { id: "outside", kind: "Tag4", props: { tt: "Outdoors" } },
+        { id: "creative", kind: "Tag4", props: { tt: "Creative" } },
         task("garden", "Windowsill garden", {
           tp: 1,
           ar: ["everyday"],
-          nt: "A little green corner. Start small and see what grows.",
+          nt: "Basil, mint and parsley. A little green corner, one pot at a time.",
         }),
         task("wander", "Slow weekend club", {
           tp: 1,
@@ -67,43 +68,70 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
           ar: ["curiosity"],
           ix: 2,
         }),
-        task("seeds", "Small beginnings", { tp: 2, pr: ["garden"] }),
-        task("care", "Room to grow", { tp: 2, pr: ["garden"], ix: 1 }),
-        task("pots", "Find a sunny spot for the little pots", {
+        task("seeds", "Planting day", { tp: 2, pr: ["garden"] }),
+        task("care", "Keep it growing", { tp: 2, pr: ["garden"], ix: 1 }),
+        task("pots", "Pot the herbs by the kitchen window", {
           pr: ["garden"],
           agr: ["seeds"],
           sr: day,
+          dd: day + 86400,
           tg: ["gentle"],
-          nt: "The bright corner by the window looks promising.\n\nNo perfect setup needed — just a little light and room to grow.",
+          nt: "Basil by the bright pane; mint in its own pot.",
         }),
         ...[
-          "Choose a favourite herb",
-          "Gather a few small pots",
-          "Add plant labels with tiny doodles",
+          "Add fresh potting mix",
+          "Plant the basil and mint",
+          "Water gently and add labels",
         ].map((tt, ix) => ({
           id: `check-${ix}`,
           kind: "ChecklistItem3",
-          props: { tt, ts: ["pots"], ix, ss: ix === 0 ? 3 : 0 },
+          props: { tt, ts: ["pots"], ix, ss: ix < 2 ? 3 : 0 },
         })),
-        task("soil", "Pick up a small bag of potting mix", {
-          pr: ["garden"],
-          agr: ["seeds"],
-          ix: 1,
-        }),
-        task("water", "Give the seedlings a little water", {
+        ...[
+          "Choose three easy herbs",
+          "Find pots with drainage holes",
+          "Make a little space by the window",
+        ].map((tt, ix) =>
+          task(`garden-done-${ix}`, tt, {
+            pr: ["garden"],
+            agr: ["seeds"],
+            ss: 3,
+            sp: day - (5 - ix) * 86400,
+            ix: ix + 1,
+          }),
+        ),
+        task("water", "Check the soil before watering", {
           pr: ["garden"],
           agr: ["care"],
+          st: 2,
+          sr: day + 86400,
+          tg: ["gentle"],
+          ix: 1,
+        }),
+        task("labels", "Draw a tiny plant-care card", {
+          pr: ["garden"],
+          agr: ["care"],
+          tg: ["creative"],
+        }),
+        task("leaves", "Photograph the first new leaves", {
+          pr: ["garden"],
+          agr: ["care"],
+          st: 2,
+          sr: day + 2 * 86400,
           ix: 2,
         }),
         task("sketch", "Sketch a leaf, wonky lines welcome", {
           pr: ["make"],
           sr: day,
+          dd: day + 2 * 86400,
+          tg: ["creative"],
           ix: 1,
         }),
         task("walk", "Take the scenic route around the pond", {
           pr: ["wander"],
           sr: day,
           tg: ["outside"],
+          nt: "Take the footbridge, then follow the reeds. Leave time to watch the ducks.",
           ix: 2,
         }),
         task("tea", "Tea, a book, and no particular hurry", {
@@ -116,16 +144,49 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
           pr: ["wander"],
           st: 2,
           sr: day + 86400,
+          tg: ["outside"],
         }),
         task("postcard", "Draw a postcard from an imaginary island", {
           pr: ["make"],
           st: 2,
           sr: day + 2 * 86400,
+          tg: ["creative"],
+        }),
+        task("route", "Pick a gentle route for the weekend", {
+          pr: ["wander"],
+          st: 2,
+          sr: day + 3 * 86400,
+          tg: ["outside"],
         }),
         task("picnic", "Pack a pocket picnic for the park", {
           pr: ["wander"],
           st: 2,
           sr: day + 4 * 86400,
+          dd: day + 4 * 86400,
+          tg: ["outside"],
+        }),
+        ...[
+          "Save a map of the riverside paths",
+          "Find the little free library",
+          "Pick a shady spot by the pond",
+          "Dust off the picnic basket",
+        ].map((tt, ix) =>
+          task(`wander-done-${ix}`, tt, {
+            pr: ["wander"],
+            ss: 3,
+            sp: day - (7 - ix) * 86400,
+            ix,
+          }),
+        ),
+        task("paper-done", "Try a few paper folds", {
+          pr: ["make"],
+          ss: 3,
+          sp: day - 2 * 86400,
+        }),
+        task("lantern", "Fold a little paper lantern", {
+          pr: ["make"],
+          tg: ["creative"],
+          ix: 2,
         }),
         task("clouds", "Make a tiny cloud-watching notebook", { st: 2 }),
         task("inbox", "Try folding a paper boat", { st: 0 }),
@@ -142,7 +203,7 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
     if (view === "project" || view === "schedule") {
       await page
         .getByRole("button", {
-          name: "0% complete Windowsill garden",
+          name: "43% complete Windowsill garden",
           exact: true,
         })
         .click();
@@ -150,13 +211,24 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
         .locator(".new-todos")
         .getByRole("button", { name: "OK", exact: true })
         .click();
+      if (view === "project") {
+        await page
+          .getByRole("button", { name: "List options", exact: true })
+          .click();
+        await page
+          .getByRole("menuitem", { name: "Hide later items", exact: true })
+          .click();
+      }
       await page.locator("#item-pots .task-title").dblclick();
       await expect(
         page.getByRole("textbox", { name: "To-do title" }),
-      ).toHaveValue("Find a sunny spot for the little pots");
+      ).toHaveValue("Pot the herbs by the kitchen window");
       await expect(
         page.getByRole("textbox", { name: "Checklist item", exact: true }),
       ).toHaveCount(3);
+      await expect(
+        page.locator('.task-editor button[aria-checked="true"]'),
+      ).toHaveCount(2);
       await page
         .getByRole("textbox", { name: "To-do title" })
         .evaluate((el) => (el as HTMLElement).blur());
@@ -178,6 +250,10 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
           })
           .toBe(true);
         await expect(picker).toBeInViewport({ ratio: 1 });
+      } else {
+        await expect(
+          page.getByRole("button", { name: "Show logged items", exact: true }),
+        ).toBeInViewport({ ratio: 1 });
       }
     } else {
       if (view === "upcoming") {
@@ -194,6 +270,15 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
       ).toBeVisible();
     }
     await expect(page.locator(".new-todos")).toHaveCount(0);
+    for (const name of [
+      "43% complete Windowsill garden",
+      "50% complete Slow weekend club",
+      "25% complete Play with paper",
+    ]) {
+      await expect(
+        page.getByRole("button", { name, exact: true }),
+      ).toBeVisible();
+    }
     await expect(page.locator("[data-theme]")).toHaveAttribute(
       "data-theme",
       "dark",
@@ -201,6 +286,14 @@ for (const view of ["today", "project", "upcoming", "schedule"] as const) {
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);
     await expect(page.locator(".preview-note")).toBeHidden();
+    if (view === "upcoming") {
+      // Fit the four populated days without a large empty tail or a clipped last row.
+      const lastTask = (await page.locator("#item-picnic").boundingBox())!;
+      await page.setViewportSize({
+        width: 900,
+        height: Math.ceil(lastTask.y + lastTask.height + 72),
+      });
+    }
     const viewport = page.viewportSize()!;
     if (view === "today" || view === "upcoming") {
       const lastTask = page.locator(
