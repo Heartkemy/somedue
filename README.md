@@ -1,19 +1,44 @@
-<img src="assets/icon/app.svg" width="96" height="96" alt="Somedue icon" />
+<p align="center">
+  <img src="assets/icon/app.svg" width="112" height="112" alt="Somedue icon" />
+</p>
 
-# Somedue
+<h1 align="center">Somedue</h1>
 
-A native macOS task manager with optional Things Cloud sync.
+<p align="center">
+  <strong>A native macOS task manager with optional Things Cloud sync.</strong>
+</p>
 
-Somedue helps you organize tasks into projects and areas, plan what to do today,
-and keep the rest for later. Use it on its own with local storage, or connect your
-Things Cloud account to work with your existing tasks.
+<p align="center">
+  Organize tasks into projects and areas, plan what to do today, and keep the rest for later.<br />
+  Use it on its own with local storage, or connect Things Cloud to work with your existing tasks.
+</p>
 
-**Very early stage and fully vibe-coded.** Somedue is not yet at alpha stage.
-It is built entirely with AI coding agents. Expect rough edges, incomplete features,
-and breaking changes. Features and data formats may change without migration support.
+<p align="center">
+  <a href="https://github.com/Heartkemy/somedue/actions/workflows/validate.yml"><img src="https://github.com/Heartkemy/somedue/actions/workflows/validate.yml/badge.svg?branch=main" alt="Validation workflow status on main" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" /></a>
+  <a href="#run-from-source"><img src="https://img.shields.io/badge/macOS-13%2B-555555?logo=apple&amp;logoColor=white" alt="macOS 13 or later" /></a>
+  <a href="docs/macos-release.md"><img src="https://img.shields.io/badge/build_targets-Apple_Silicon_%26_Intel-555555" alt="Build targets: Apple Silicon and Intel" /></a>
+  <a href="#current-limitations"><img src="https://img.shields.io/badge/status-pre--alpha-e9a23b" alt="Status: pre-alpha" /></a>
+</p>
 
-Somedue is an independent, open-source project and is not affiliated with or
-endorsed by Cultured Code, the makers of Things.
+<p align="center">
+  <strong>Very early stage and fully vibe-coded.</strong> Somedue is not yet at alpha stage.<br />
+  It is built entirely with AI coding agents. Expect rough edges, incomplete features, and breaking changes.<br />
+  Features and data formats may change without migration support.
+</p>
+
+<p align="center">
+  Somedue is an independent, open-source project and is not affiliated with or<br />
+  endorsed by Cultured Code, the makers of Things.
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/today.png" alt="Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned." />
+</p>
+
+<p align="center">
+  <em>Today, with fictional tasks. All screenshots use synthetic data and a decorative macOS window frame.</em>
+</p>
 
 ## What it does
 
@@ -30,6 +55,30 @@ Click a to-do to select it. Press Enter or double-click to edit it; click empty
 space to clear the selection. Drag checklist items by their right-hand handles,
 or use Option ↑ / ↓ while editing an item.
 
+### Projects and details
+
+Keep a project in small steps, with notes and a checklist when you need them.
+
+<p align="center">
+  <img src="docs/screenshots/project.png" alt="A windowsill garden project in the dark theme, with headings, notes, and an open task checklist." />
+</p>
+
+### Plan ahead
+
+Upcoming gives scheduled tasks a place in the days ahead.
+
+<p align="center">
+  <img src="docs/screenshots/upcoming.png" alt="Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week." />
+</p>
+
+### Schedule a task
+
+Choose a start date without leaving the task you're editing.
+
+<p align="center">
+  <img src="docs/screenshots/schedule.png" alt="The scheduling picker open beside a garden task, with Today, This Evening, and calendar choices." />
+</p>
+
 ## Current limitations
 
 Somedue does not yet implement everything Things can do. Advanced repeating-task
@@ -44,7 +93,7 @@ app is not notarized. Test it with nonessential data before relying on it.
 
 ## Run from source
 
-You need macOS 13 or later, [Bun 1.4.3](https://bun.sh),
+You need macOS 13 or later, [Bun 1.4.4](https://bun.sh),
 [Rust and Cargo 1.99.1](https://www.rust-lang.org/tools/install), and Apple's Xcode
 Command Line Tools (`xcode-select --install`). These are the versions used in CI.
 
@@ -151,6 +200,13 @@ classes such as `task-row` also serve as behavior/test hooks. Measured sidebar
 widths and viewport-aware popup positions remain runtime values.
 
 ### Checks
+
+To refresh the README screenshots, run `bun run screenshots` with Docker running.
+The capture uses a fixed date and isolated, fictional tasks from
+[`tests/browser/readme-screenshots.ts`](tests/browser/readme-screenshots.ts).
+Review the generated PNGs in `docs/screenshots/` after visible UI changes.
+The capture hides the browser-only preview notice and adds rounded macOS-style
+frames, traffic-light controls, and shadows only to the documentation images.
 
 ```sh
 bun run build          # TypeScript check and production frontend build
