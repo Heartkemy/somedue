@@ -7,7 +7,7 @@ const workflow = readFileSync(
   "utf8",
 );
 
-test("macOS rehearsal is native, pinned, and nonpublishing", () => {
+test("macOS packaging is native, pinned, and retains artifacts only for version tags", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /- "v\*"/);
   assert.match(workflow, /- "rehearsal-\*"/);
@@ -31,6 +31,10 @@ test("macOS rehearsal is native, pinned, and nonpublishing", () => {
   assert.doesNotMatch(workflow, /^\s*pull_request:/m);
   assert.doesNotMatch(
     workflow,
-    /^\s*-\s+(?:uses|run):.*(?:upload-artifact|create-release|gh release|no-quarantine|xattr)/m,
+    /^\s*-\s+(?:uses|run):.*(?:create-release|gh release|no-quarantine|xattr)/m,
+  );
+  assert.match(
+    workflow,
+    /if: startsWith\(github.ref, 'refs\/tags\/v'\)\n\s+uses: actions\/upload-artifact@[a-f0-9]{40}/,
   );
 });
