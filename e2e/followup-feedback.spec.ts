@@ -119,6 +119,83 @@ test("schedule glyph and list controls align with their text gutter", async ({
   );
 });
 
+test("Anytime keeps the calendar button after saving and reopening", async ({
+  page,
+}, info) => {
+  await page
+    .locator(".project-nav")
+    .filter({ hasText: /^project$/ })
+    .click();
+  const row = page.locator("#item-child .task-title");
+  await row.dblclick();
+  const editor = page.locator(".task-editor");
+  const when = editor.getByRole("button", { name: "When", exact: true });
+  const expectDefaultSchedule = async () => {
+    await expect(when).toHaveText("");
+    await expect(when.locator("svg")).toHaveClass(/lucide-calendar-days/);
+    await expect(
+      editor.getByRole("button", { name: "Remove schedule", exact: true }),
+    ).toHaveCount(0);
+  };
+  await expectDefaultSchedule();
+  await editor
+    .getByRole("textbox", { name: "To-do title" })
+    .fill("Saved anytime task");
+  await page.locator("h1").click();
+  await expect(row).toHaveText("Saved anytime task");
+  await row.dblclick();
+  await expectDefaultSchedule();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).__TEST_STATE__.entities.find(
+          (item: any) => item.id === "child",
+        ).props.st,
+    ),
+  ).toBe(1);
+
+  const picker = page.getByRole("dialog", { name: "When", exact: true });
+  for (const mode of ["Today", "This Evening", "Someday", "Anytime"]) {
+    await when.click();
+    await picker.getByRole("button", { name: mode, exact: true }).click();
+    if (mode === "Anytime") await expectDefaultSchedule();
+    else {
+      await expect(when).toHaveText(mode);
+      await expect(
+        editor.getByRole("button", { name: "Remove schedule", exact: true }),
+      ).toBeVisible();
+    }
+  }
+  await when.click();
+  await picker
+    .getByRole("textbox", { name: "When date", exact: true })
+    .fill("2030-06-15");
+  await picker
+    .getByRole("textbox", { name: "When date", exact: true })
+    .press("Enter");
+  await expect(when).toHaveText("Jun 15");
+  await editor
+    .getByRole("button", { name: "Remove schedule", exact: true })
+    .click();
+  await expectDefaultSchedule();
+
+  await editor.getByRole("button", { name: "Deadline", exact: true }).click();
+  const deadline = page.getByRole("dialog", { name: "Deadline", exact: true });
+  await deadline
+    .getByRole("textbox", { name: "Deadline date", exact: true })
+    .fill("2030-06-20");
+  await deadline
+    .getByRole("textbox", { name: "Deadline date", exact: true })
+    .press("Enter");
+  await expect(
+    editor.getByRole("button", { name: "Remove deadline", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("anytime-calendar-button.png"),
+    animations: "disabled",
+  });
+});
+
 test("the full sidebar edge resizes and its handle appears only near the edge", async ({
   page,
 }) => {

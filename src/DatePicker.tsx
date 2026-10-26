@@ -198,12 +198,12 @@ export default function DatePicker(props: {
     !!props.clearable &&
     (props.kind === "deadline"
       ? !!props.value
-      : !!props.mode && props.mode !== "Inbox");
+      : !!props.mode && !["Inbox", "Anytime"].includes(props.mode));
   const iconOnly = () =>
     props.iconOnly ||
     (props.clearable &&
       props.kind === "when" &&
-      (!props.mode || props.mode === "Inbox"));
+      (!props.mode || ["Inbox", "Anytime"].includes(props.mode)));
   return (
     <div
       class="schedule-chip flex min-w-0 items-center rounded-md transition-colors"
@@ -399,14 +399,7 @@ export default function DatePicker(props: {
           </>
         )}
       </Popover>
-      <Show
-        when={
-          props.clearable &&
-          (props.kind === "deadline"
-            ? props.value
-            : props.mode && props.mode !== "Inbox")
-        }
-      >
+      <Show when={hasSurface()}>
         <IconButton
           size="compact"
           variant="quiet"

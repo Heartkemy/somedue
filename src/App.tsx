@@ -2181,7 +2181,7 @@ export default function App() {
                                   >
                                     <Button
                                       variant="bare"
-                                      class="min-w-0 justify-start truncate text-left"
+                                      class="-mx-2 -my-1 min-w-0 justify-start truncate rounded-md px-2 py-1 text-left"
                                       onClick={() => navigate(section().id)}
                                     >
                                       {section().label}
