@@ -151,11 +151,11 @@ for (const [theme, width] of [
           .getByRole("dialog", { name: "When", exact: true })
           .getByRole("button", { name: mode, exact: true })
           .click();
+        const surface = page.locator(".task-editor .schedule-chip").first();
         expect(
-          (await page
-            .locator(".task-editor .schedule-chip")
-            .first()
-            .boundingBox())!.x,
+          (await (
+            mode === "Anytime" ? when.locator("svg") : surface
+          ).boundingBox())!.x,
         ).toBe(edge);
       }
       await when.click();
@@ -172,6 +172,42 @@ for (const [theme, width] of [
       ).toBe(edge);
       await page.screenshot({
         path: info.outputPath("editor-surface-edges.png"),
+        animations: "disabled",
+      });
+    });
+
+    test("group title hover has padded rounded edges without moving its text", async ({
+      page,
+    }, info) => {
+      await page.getByRole("button", { name: "Anytime", exact: true }).click();
+      const heading = page
+        .locator(".anytime-group-heading")
+        .filter({ hasText: "project" });
+      const button = heading.getByRole("button", {
+        name: "project",
+        exact: true,
+      });
+      const textX = () =>
+        button.evaluate((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return range.getBoundingClientRect().x;
+        });
+      const before = await textX();
+      expect(before).toBe((await heading.boundingBox())!.x + 16 + 12);
+      await button.hover();
+      expect(await textX()).toBe(before);
+      await expect(button).toHaveCSS("padding-left", "8px");
+      await expect(button).toHaveCSS("padding-right", "8px");
+      await expect(button).toHaveCSS("padding-top", "4px");
+      await expect(button).toHaveCSS("padding-bottom", "4px");
+      await expect(button).toHaveCSS("border-radius", "6px");
+      await expect(button).not.toHaveCSS(
+        "background-color",
+        "rgba(0, 0, 0, 0)",
+      );
+      await page.screenshot({
+        path: info.outputPath("group-title-hover.png"),
         animations: "disabled",
       });
     });
