@@ -8,3 +8,12 @@ Custom CSS is allowed only in exceptional cases where Tailwind cannot express
 what is needed. Document the reason beside the exception. Theme configuration
 belongs in `src/style.css`; do not reintroduce component stylesheets or hard-coded
 pixel utilities.
+
+# README screenshots
+
+When a UI change affects a README screenshot, refresh the affected images in
+`docs/screenshots/` before finishing. Run `bun run screenshots` (requires Docker)
+and visually inspect the results. Use only the dark theme. Keep the synthetic
+fixture in `tests/browser/readme-screenshots.ts` serene, playful, and non-biased; never
+capture personal tasks, credentials, or Things Cloud data. Update README image
+references and captions when the views change.

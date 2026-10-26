@@ -20,6 +20,7 @@
     "test:native": "bun scripts/native-test.mjs",
     "test:ui": "bun run build && playwright test",
     "test:ui:docker": "bun run build && bun scripts/ui-test-docker.mjs",
+    "screenshots": "bun run build && bun scripts/ui-test-docker.mjs --config playwright.screenshots.config.ts",
     "notices": "bun scripts/third-party-notices.mjs"
   },
   "dependencies": {
