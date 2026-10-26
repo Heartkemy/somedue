@@ -7,13 +7,12 @@ const fixture = readFileSync(
   "utf8",
 );
 
-for (const view of [
-  "today",
-  "project",
-  "upcoming",
-  "schedule",
-] as const) {
+for (const view of ["today", "project", "upcoming", "schedule"] as const) {
   test(`capture ${view}`, async ({ page, context }) => {
+    if (view === "today")
+      await page.setViewportSize({ width: 900, height: 560 });
+    if (view === "upcoming")
+      await page.setViewportSize({ width: 900, height: 680 });
     // A fixed clock and isolated IPC keep captures repeatable and free of personal data.
     await page.clock.setFixedTime(new Date("2026-10-26T10:00:00Z"));
     await page.route("**/*", (route) =>
@@ -162,13 +161,23 @@ for (const view of [
         .getByRole("textbox", { name: "To-do title" })
         .evaluate((el) => (el as HTMLElement).blur());
       if (view === "schedule") {
-        await page
+        const trigger = page
           .locator(".task-editor")
-          .getByRole("button", { name: "When", exact: true })
-          .click();
-        await expect(
-          page.getByRole("dialog", { name: "When", exact: true }),
-        ).toBeVisible();
+          .getByRole("button", { name: "When", exact: true });
+        await trigger.evaluate((el) =>
+          el.scrollIntoView({ block: "center", behavior: "instant" }),
+        );
+        await trigger.click();
+        const picker = page.getByRole("dialog", { name: "When", exact: true });
+        await expect(picker).toBeVisible();
+        await expect
+          .poll(async () => {
+            const anchor = (await trigger.boundingBox())!;
+            const popup = (await picker.boundingBox())!;
+            return popup.y >= anchor.y + anchor.height;
+          })
+          .toBe(true);
+        await expect(picker).toBeInViewport({ ratio: 1 });
       }
     } else {
       if (view === "upcoming") {
@@ -192,6 +201,15 @@ for (const view of [
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);
     await expect(page.locator(".preview-note")).toBeHidden();
+    const viewport = page.viewportSize()!;
+    if (view === "today" || view === "upcoming") {
+      const lastTask = page.locator(
+        view === "today" ? "#item-tea" : "#item-picnic",
+      );
+      await expect(lastTask).toBeInViewport({ ratio: 1 });
+      const bounds = (await lastTask.boundingBox())!;
+      expect(viewport.height - bounds.y - bounds.height).toBeLessThan(120);
+    }
     const capture = await page.screenshot({
       animations: "disabled",
       caret: "hide",
@@ -200,11 +218,14 @@ for (const view of [
     // Synthetic macOS chrome belongs to the documentation artifact, not the product.
     // CSS here is a standalone capture stage; app UI styling stays in Tailwind.
     const frame = await context.newPage();
-    await frame.setViewportSize({ width: 1280, height: 920 });
+    await frame.setViewportSize({
+      width: viewport.width + 80,
+      height: viewport.height + 80,
+    });
     await frame.setContent(`<!doctype html><html><head><style>
       * { box-sizing: border-box; }
       body { margin: 0; padding: 32px 40px 48px; }
-      main { position: relative; width: 1200px; height: 840px; overflow: hidden;
+      main { position: relative; width: ${viewport.width}px; height: ${viewport.height}px; overflow: hidden;
         border-radius: 14px; box-shadow: 0 16px 32px rgb(0 0 0 / 28%); }
       img { display: block; width: 100%; height: 100%; }
       nav { position: absolute; top: 16px; left: 20px; display: flex; gap: 8px; }

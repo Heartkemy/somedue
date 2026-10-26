@@ -15,7 +15,7 @@ and breaking changes. Features and data formats may change without migration sup
 Somedue is an independent, open-source project and is not affiliated with or
 endorsed by Cultured Code, the makers of Things.
 
-<img src="docs/screenshots/today.png" width="480" alt="Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned." />
+<img src="docs/screenshots/today.png" alt="Today in Somedue's dark theme, with a few creative tasks and a quiet evening planned." />
 
 *Today, with fictional tasks. All screenshots use synthetic data and a decorative macOS window frame.*
 
@@ -38,19 +38,19 @@ or use Option ↑ / ↓ while editing an item.
 
 Keep a project in small steps, with notes and a checklist when you need them.
 
-<img src="docs/screenshots/project.png" width="480" alt="A windowsill garden project in the dark theme, with headings, notes, and an open task checklist." />
+<img src="docs/screenshots/project.png" alt="A windowsill garden project in the dark theme, with headings, notes, and an open task checklist." />
 
 ### Plan ahead
 
 Upcoming gives scheduled tasks a place in the days ahead.
 
-<img src="docs/screenshots/upcoming.png" width="480" alt="Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week." />
+<img src="docs/screenshots/upcoming.png" alt="Upcoming in the dark theme, with a book swap, a drawing idea, and a park picnic scheduled across the week." />
 
 ### Schedule a task
 
 Choose a start date without leaving the task you're editing.
 
-<img src="docs/screenshots/schedule.png" width="480" alt="The scheduling picker open beside a garden task, with Today, This Evening, and calendar choices." />
+<img src="docs/screenshots/schedule.png" alt="The scheduling picker open beside a garden task, with Today, This Evening, and calendar choices." />
 
 ## Current limitations
 

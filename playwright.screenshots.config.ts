@@ -8,7 +8,7 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   use: {
     ...config.use,
-    viewport: { width: 1200, height: 840 },
+    viewport: { width: 900, height: 840 },
     deviceScaleFactor: 2,
     locale: "en-GB",
     timezoneId: "UTC",

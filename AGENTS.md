@@ -18,7 +18,9 @@ fixture in `tests/browser/readme-screenshots.ts` serene, playful, and non-biased
 capture personal tasks, credentials, or Things Cloud data. Update README image
 references and captions when the views change.
 
-Keep README images at `width="480"` with their aspect ratio preserved. The capture
-script hides the browser preview notice only while taking screenshots and adds
+Use compact app viewports for Today and Upcoming to avoid large empty areas;
+do not shrink README images with fixed display widths. Keep image proportions intact. The
+capture script sizes the window frame to each viewport, hides the browser preview
+notice only while taking screenshots and adds
 synthetic macOS traffic lights, rounded corners, and soft shadows. Preserve this
 presentation when refreshing images; do not change the app for screenshot framing.
