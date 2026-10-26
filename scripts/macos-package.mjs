@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { stageKeychainHelper } from './keychain-helper.mjs';
@@ -36,6 +36,11 @@ if (flags.has('--skip-build')) {
   const previous = JSON.parse(readFileSync(path.join(root, 'out/build-receipt.json'), 'utf8'));
   if (previous.identity !== identity || previous.executableSha256 !== digest(executable)) throw new Error('Cannot skip build: the existing binary has no matching package receipt and compile-time signing identity.');
 }
+run('bun', ['run', 'notices']);
+const notices = path.join(root, 'out/THIRD_PARTY_NOTICES.md');
+const bundledNotices = path.join(app, 'Contents/Resources/THIRD_PARTY_NOTICES.md');
+copyFileSync(notices, bundledNotices);
+if (digest(notices) !== digest(bundledNotices)) throw new Error('Bundled third-party notices do not match the generated source.');
 
 const helper = identity === '-' ? null : stageKeychainHelper(path.join(app, 'Contents/Resources'), identity);
 run('codesign', ['--force', '--sign', identity, '--timestamp=none', '--identifier', bundleId, app]);
