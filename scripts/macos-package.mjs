@@ -200,16 +200,19 @@ function verifyArchitecture(app, target) {
 }
 
 function verifyAdHocCredentialBoundary(executable) {
-  const result = spawnSync(
-    executable,
-    ["--keychain-self-test", "create", "verification-package-boundary"],
-    { encoding: "utf8" },
-  );
-  const output = `${result.stdout || ""}${result.stderr || ""}`;
-  if (result.status === 0 || !output.includes("without its signing identity")) {
-    throw new Error(
-      "Ad-hoc package unexpectedly accepted a synthetic Keychain credential operation.",
+  for (const [operation, refusal] of [
+    ["create", "without its signing identity"],
+    ["cloud", "local-only"],
+  ]) {
+    const result = spawnSync(
+      executable,
+      ["--keychain-self-test", operation, "verification-package-boundary"],
+      { encoding: "utf8" },
     );
+    const output = `${result.stdout || ""}${result.stderr || ""}`;
+    if (result.status === 0 || !output.includes(refusal)) {
+      throw new Error(`Ad-hoc package did not refuse ${operation} access.`);
+    }
   }
 }
 
@@ -263,7 +266,7 @@ function previewReadme({ version, target, adHoc }) {
     "",
     `Signing: ${adHoc ? "ad-hoc" : "local certificate"}. This build is not notarized.`,
     adHoc
-      ? "This ad-hoc build cannot save Things Cloud credentials; use synthetic or local-only data."
+      ? "This local-only alpha cannot save Things Cloud credentials or connect to Things Cloud."
       : "This local certificate-signed build uses the configured Keychain credential boundary.",
     "macOS Gatekeeper may block unnotarized builds. This image does not remove quarantine attributes or change macOS security policy.",
     "Install by copying Somedue.app normally. Do not bypass macOS security protections.",
@@ -334,7 +337,7 @@ function createAndVerifyDmg({
     } finally {
       if (mountPoint) run("hdiutil", ["detach", mountPoint]);
     }
-    return { path: dmg, sha256: digest(dmg) };
+    return { path: path.basename(dmg), sha256: digest(dmg) };
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
@@ -414,6 +417,7 @@ function main() {
       (previous.target !== target.triple ||
         previous.identity !== identity ||
         previous.executableSha256 !== digest(sourceExecutable) ||
+        previous.cloudAccess !== !adHoc ||
         previous.savedCloudCredentials !== !adHoc)
     ) {
       throw new Error(
@@ -459,6 +463,10 @@ function main() {
     }
 
     mkdirSync(target.outputDir, { recursive: true });
+    copyFileSync(
+      notices,
+      path.join(target.outputDir, "THIRD_PARTY_NOTICES.md"),
+    );
     copyApp(target.app, target.artifactApp);
     const artifact = verifyBundle(target.artifactApp, target, {
       adHoc,
@@ -478,8 +486,10 @@ function main() {
       identity,
       notarized: false,
       savedCloudCredentials: !adHoc,
+      cloudAccess: !adHoc,
       minimumSystemVersion: artifact.minimumSystemVersion,
       builtAt: new Date().toISOString(),
+      sourceCommit: read("git", ["rev-parse", "HEAD"]),
       hostArchitecture: process.arch,
       nativeRuntimeCheck:
         adHoc && target.arch === hostMacArchitecture(process.arch),

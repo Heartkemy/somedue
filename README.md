@@ -5,12 +5,12 @@
 <h1 align="center">Somedue</h1>
 
 <p align="center">
-  <strong>A native macOS task manager with optional Things Cloud sync.</strong>
+  <strong>A native macOS task manager.</strong>
 </p>
 
 <p align="center">
   Organize tasks into projects and areas, plan what to do today, and keep the rest for later.<br />
-  Use it on its own with local storage, or connect Things Cloud to work with your existing tasks.
+  Alpha 1 downloads work locally. Experimental Things Cloud sync is available in source builds.
 </p>
 
 <p align="center">
@@ -18,11 +18,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" /></a>
   <a href="#run-from-source"><img src="https://img.shields.io/badge/macOS-13%2B-555555?logo=apple&amp;logoColor=white" alt="macOS 13 or later" /></a>
   <a href="docs/macos-release.md"><img src="https://img.shields.io/badge/build_targets-Apple_Silicon_%26_Intel-555555" alt="Build targets: Apple Silicon and Intel" /></a>
-  <a href="#current-limitations"><img src="https://img.shields.io/badge/status-pre--alpha-e9a23b" alt="Status: pre-alpha" /></a>
+  <a href="#current-limitations"><img src="https://img.shields.io/badge/status-Alpha_1-e9a23b" alt="Status: Alpha 1" /></a>
 </p>
 
 <p align="center">
-  <strong>Very early stage and fully vibe-coded.</strong> Somedue is not yet at alpha stage.<br />
+  <strong>Alpha 1 — an early, experimental release.</strong><br />
   It is built entirely with AI coding agents. Expect rough edges, incomplete features, and breaking changes.<br />
   Features and data formats may change without migration support.
 </p>
@@ -47,8 +47,8 @@
 - **Add the details:** Markdown notes, checklists, start dates, and deadlines.
 - **Stay on the keyboard:** Quick Find, inline editing, and Quick Entry with an
   optional global shortcut.
-- **Work locally or sync:** tasks and pending edits are stored in SQLite on your
-  Mac; optional Things Cloud sync includes conflict and draft recovery controls.
+- **Keep tasks on your Mac:** tasks are stored locally in SQLite. Source builds
+  also offer experimental Things Cloud sync with conflict and draft recovery.
 - **Set local reminders:** notifications fire while Somedue is running.
 
 Click a to-do to select it. Press Enter or double-click to edit it; click empty
@@ -79,6 +79,27 @@ Choose a start date without leaving the task you're editing.
   <img src="docs/screenshots/schedule.png" alt="The scheduling picker open beside a garden task, with Today, This Evening, and calendar choices." />
 </p>
 
+## Download Alpha 1
+
+Requires macOS 13 or later. Choose the DMG for your Mac:
+
+- [Apple Silicon](https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.1/Somedue-0.1.1-alpha.1-arm64.dmg)
+- [Intel](https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.1/Somedue-0.1.1-alpha.1-x86_64.dmg)
+
+Open the DMG and copy `Somedue.app` to Applications. Checksums and release notes
+are on the [Alpha 1 release](https://github.com/Heartkemy/somedue/releases/tag/v0.1.1-alpha.1).
+
+Or install from the maintainer's Homebrew tap:
+
+```sh
+brew install --cask heartkemy/somedue/somedue
+```
+
+These downloads are **local-only**, ad-hoc signed, and not notarized. Homebrew
+keeps macOS quarantine enabled; it does not make the app warning-free. macOS may
+block opening the app. Review [Apple's guidance](https://support.apple.com/en-us/102445)
+before deciding to open a download you trust.
+
 ## Current limitations
 
 Somedue does not yet implement everything Things can do. Advanced repeating-task
@@ -88,8 +109,10 @@ after-completion rules create copies locally. Advanced imported rules, repeating
 projects and newer opaque repeaters still require Things. Reminders created in
 Somedue are local and do not sync to other devices.
 
-Only macOS is supported. Things Cloud access uses an unofficial protocol, and the
-app is not notarized. Test it with nonessential data before relying on it.
+Only macOS is supported. Alpha 1 downloads cannot connect to Things Cloud. Source
+builds use an unofficial protocol. The app is not notarized. Test it with
+nonessential data before relying on it; the oldest supported OS and native Intel
+runtime have not been verified on every release.
 
 ## Run from source
 
@@ -139,7 +162,8 @@ normally and opens the updated app. Save any open edits before running it.
 Once signing is configured, `bun run install:macos` is the one-shot update command.
 It builds the current working files, including uncommitted changes; no commit or
 branch switch is required. Without a configured
-certificate, it produces an ad-hoc local build that cannot save Cloud credentials.
+certificate, it produces a local-only ad-hoc build that cannot connect to Cloud
+or save Cloud credentials.
 
 ### Local ad-hoc preview DMGs
 
@@ -158,17 +182,17 @@ third-party notices, and the ad-hoc Keychain boundary on the native host target.
 The target Rust standard libraries must already be installed; the script does not
 download or configure a toolchain for you.
 
-These previews are ad-hoc signed and not notarized. They cannot save Things Cloud
-credentials, and are intended for local or synthetic data only. Gatekeeper may
+These previews are ad-hoc signed and not notarized. They cannot connect to Things
+Cloud or save its credentials. Gatekeeper may
 block an unnotarized build; the package deliberately does not remove quarantine
 attributes, disable Gatekeeper, or change macOS security policy. An Intel build
 made on Apple Silicon is structurally inspected only: Rosetta is not native Intel
 coverage, and macOS 13 has not been runtime-tested merely because it is the
 declared minimum system version.
 
-For the nonpublishing release rehearsal and the gated Cask preparation process,
-see [the macOS release guide](docs/macos-release.md). Ad-hoc preview DMGs are not
-eligible for public Homebrew Cask publication.
+For release verification and the maintainer-owned tap process, see
+[the macOS release guide](docs/macos-release.md). These ad-hoc previews are not
+eligible for the official `homebrew/cask` repository.
 
 You can also store the fingerprint in
 `~/Library/Application Support/Somedue/macos-signing-identity`.

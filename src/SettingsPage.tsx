@@ -33,6 +33,7 @@ import {
   type Changes,
 } from "./model";
 import appIcon from "../assets/icon/app.svg";
+import { version } from "../package.json";
 export default function SettingsPage(props: {
   state: State;
   tab: string;
@@ -284,83 +285,94 @@ export default function SettingsPage(props: {
           </Show>
           <Show when={settingsTab() === "Things Cloud"}>
             <SectionHeading>Things Cloud</SectionHeading>
-            <p class="muted text-muted">
-              Connect using your Things Cloud account. Your password is stored
-              only in macOS Keychain.
-            </p>
             <Show
-              when={state().account === "local"}
+              when={state().cloudAvailable !== false}
               fallback={
-                <div class="account-card flex flex-col items-start gap-3 py-4 text-xs [&_svg]:text-mint [&>span]:text-xs [&>span]:text-muted [&>button]:text-accent">
-                  <Cloud size={24} />
-                  <strong>{state().account}</strong>
-                  <span>
-                    {state().lastSync
-                      ? `Last sync ${new Date(state().lastSync!).toLocaleString()}`
-                      : "Not yet synced"}
-                  </span>
-                  <span>{state().pending} pending edits</span>
-                  <Button
-                    onClick={() => void props.sync()}
-                    disabled={props.syncing}
-                  >
-                    <RefreshCw size={15} />
-                    Sync now
+                <p class="text-muted">
+                  This download stores your tasks on this Mac. Things Cloud sync
+                  is unavailable. Experimental Cloud sync is available in source
+                  builds.
+                </p>
+              }
+            >
+              <p class="muted text-muted">
+                Connect using your Things Cloud account. Your password is stored
+                only in macOS Keychain.
+              </p>
+              <Show
+                when={state().account === "local"}
+                fallback={
+                  <div class="account-card flex flex-col items-start gap-3 py-4 text-xs [&_svg]:text-mint [&>span]:text-xs [&>span]:text-muted [&>button]:text-accent">
+                    <Cloud size={24} />
+                    <strong>{state().account}</strong>
+                    <span>
+                      {state().lastSync
+                        ? `Last sync ${new Date(state().lastSync!).toLocaleString()}`
+                        : "Not yet synced"}
+                    </span>
+                    <span>{state().pending} pending edits</span>
+                    <Button
+                      onClick={() => void props.sync()}
+                      disabled={props.syncing}
+                    >
+                      <RefreshCw size={15} />
+                      Sync now
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        ask(
+                          "Disconnect this account? Its cached tasks and pending edits stay on this Mac. The password will be removed from Keychain.",
+                          async () => {
+                            setState(await call("disconnect"));
+                          },
+                        )
+                      }
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                }
+              >
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    props.connect();
+                  }}
+                >
+                  Connect Things Cloud
+                </Button>
+                <p class="small muted connect-hint text-xs text-muted mt-4 max-w-prose">
+                  Signing in opens your cloud workspace. Your local to-dos
+                  remain saved separately.
+                </p>
+              </Show>
+              <Show when={state().blocked}>
+                <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
+                  <h4>Sync recovery</h4>
+                  <p>
+                    A change may conflict with another device or have an
+                    unconfirmed server response. Pending edits are preserved and
+                    will not be resent automatically.
+                  </p>
+                  <Button onClick={() => void exportData()}>
+                    Export drafts first
                   </Button>
                   <Button
                     onClick={() =>
                       ask(
-                        "Disconnect this account? Its cached tasks and pending edits stay on this Mac. The password will be removed from Keychain.",
+                        "Replace pending drafts with the current cloud version? A recovery copy will be retained in your local backup.",
                         async () => {
-                          setState(await call("disconnect"));
+                          setState(
+                            await call("resolve_drafts", { confirm: true }),
+                          );
                         },
                       )
                     }
                   >
-                    Disconnect
+                    Use cloud version
                   </Button>
                 </div>
-              }
-            >
-              <Button
-                variant="primary"
-                onClick={() => {
-                  props.connect();
-                }}
-              >
-                Connect Things Cloud
-              </Button>
-              <p class="small muted connect-hint text-xs text-muted mt-4 max-w-prose">
-                Signing in opens your cloud workspace. Your local to-dos remain
-                saved separately.
-              </p>
-            </Show>
-            <Show when={state().blocked}>
-              <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
-                <h4>Sync recovery</h4>
-                <p>
-                  A change may conflict with another device or have an
-                  unconfirmed server response. Pending edits are preserved and
-                  will not be resent automatically.
-                </p>
-                <Button onClick={() => void exportData()}>
-                  Export drafts first
-                </Button>
-                <Button
-                  onClick={() =>
-                    ask(
-                      "Replace pending drafts with the current cloud version? A recovery copy will be retained in your local backup.",
-                      async () => {
-                        setState(
-                          await call("resolve_drafts", { confirm: true }),
-                        );
-                      },
-                    )
-                  }
-                >
-                  Use cloud version
-                </Button>
-              </div>
+              </Show>
             </Show>
           </Show>
           <Show when={settingsTab() === "Tags"}>
@@ -478,17 +490,18 @@ export default function SettingsPage(props: {
             <SectionHeading>Somedue</SectionHeading>
             <p>A considered home for what comes next.</p>
             <p class="muted text-muted">
-              Version 0.1.1
+              Version {version} · Alpha 1
               <br />
-              An independent Things Cloud client.
+              An independent macOS task manager.
               <br />
               Not affiliated with Cultured Code.
             </p>
             <p class="small muted text-xs text-muted">
-              Local certificate signing. Not notarized.
+              {state().cloudAvailable === false
+                ? "Local-only download. Ad-hoc signed and not notarized."
+                : "Experimental source build. Cloud sync uses an unofficial protocol."}
               <br />
-              Cloud protocol is unofficial. See the repository’s verification
-              record for tested behavior and limitations.
+              See the repository for installation details and limitations.
             </p>
           </Show>
         </div>

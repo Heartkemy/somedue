@@ -1310,7 +1310,11 @@ export default function App() {
           ),
         );
         if (state().account !== "local") void refresh();
-        else if (!state().entities.length && !pref("welcomeSeen", false))
+        else if (
+          state().cloudAvailable !== false &&
+          !state().entities.length &&
+          !pref("welcomeSeen", false)
+        )
           setConnectionOpen(true);
       }).finally(() => setLoading(false));
       void listen<string>("sync-error", (e) => setError(e.payload)).then(
@@ -1872,6 +1876,7 @@ export default function App() {
                 backLabel={current() ? title(current()!) : list()}
                 close={closeSettings}
                 connect={() => {
+                  if (state().cloudAvailable === false) return;
                   setSettings(false);
                   setConnectionOpen(true);
                 }}

@@ -23,9 +23,7 @@ fn message(code: i32) -> String {
         }
         -128 => "Keychain access was cancelled. Retry and allow access to Somedue.".into(),
         -25293 => "Keychain access was denied. Unlock your login Keychain and retry.".into(),
-        -25308 => {
-            "Keychain requires interaction. Unlock your Mac and retry from Somedue.".into()
-        }
+        -25308 => "Keychain requires interaction. Unlock your Mac and retry from Somedue.".into(),
         _ => format!(
             "macOS Keychain operation failed ({code}). Unlock your login Keychain and retry."
         ),
@@ -146,6 +144,21 @@ fn use_helper() -> bool {
     option_env!("SOMEDUE_SIGNER").is_some()
 }
 
+pub fn cloud_available() -> bool {
+    use_helper() || cfg!(debug_assertions)
+}
+
+pub fn require_cloud() -> Result<(), String> {
+    if cloud_available() {
+        Ok(())
+    } else {
+        Err(
+            "This download is local-only. Experimental Things Cloud sync requires a source build."
+                .into(),
+        )
+    }
+}
+
 pub fn set(account: &str, password: &str) -> Result<(), String> {
     validate_account(account)?;
     if password.is_empty() || password.len() > 64 * 1024 {
@@ -184,12 +197,13 @@ pub fn delete(account: &str) -> Result<(), String> {
 /// Deliberately restrict the namespace and fixture; never accept a real secret.
 pub fn self_test(arguments: &[String]) -> Result<(), String> {
     if arguments.len() != 2 || !arguments[1].starts_with("verification-") {
-        return Err("Usage: --keychain-self-test create|read|update|read-updated|delete verification-UNIQUE-ID".into());
+        return Err("Usage: --keychain-self-test create|read|update|read-updated|delete|cloud verification-UNIQUE-ID".into());
     }
     let account = &arguments[1];
     let original = r#"{"password":"synthetic-keychain-fixture","history":"synthetic"}"#;
     let updated = r#"{"password":"synthetic-keychain-fixture-updated","history":"synthetic"}"#;
     match arguments[0].as_str() {
+        "cloud" => require_cloud()?,
         "create" => set(account, original)?,
         "read" => {
             if get(account)? != original {

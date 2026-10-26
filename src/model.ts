@@ -3,6 +3,7 @@ export type Entity = { id: string; kind: string; props: Props };
 export type State = {
   entities: Entity[];
   account: string;
+  cloudAvailable?: boolean;
   pending: number;
   blocked: boolean;
   lastSync: string | null;

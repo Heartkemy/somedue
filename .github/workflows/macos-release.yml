@@ -1,4 +1,4 @@
-name: macOS package rehearsal
+name: macOS packages
 
 on:
   workflow_dispatch:
@@ -64,5 +64,15 @@ jobs:
       - run: bun test tests/macos-package.test.mjs tests/macos-lipo.test.mjs tests/homebrew-cask.test.mjs tests/macos-release-workflow.test.mjs
       - run: SOMEDUE_CODESIGN_IDENTITY=- bun scripts/macos-package.mjs --target "${{ matrix.target }}" --dmg
       - run: bun scripts/homebrew-cask.mjs --check-receipt "out/macos/ad-hoc/${{ matrix.arch }}/build-receipt.json"
+      - if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            out/macos/ad-hoc/${{ matrix.arch }}/*.dmg
+            out/macos/ad-hoc/${{ matrix.arch }}/build-receipt.json
+            out/macos/ad-hoc/${{ matrix.arch }}/THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
+          retention-days: 7
 
-# This workflow deliberately has no upload-artifact, release, or publishing step.
+# Manual and rehearsal-tag runs validate locally; version tags also retain packages.

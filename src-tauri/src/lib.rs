@@ -16,7 +16,7 @@ struct App {
 }
 struct Shared(Mutex<App>, tokio::sync::Mutex<()>);
 fn view(a: &App) -> Value {
-    json!({"entities":a.workspace.snapshot.entities.values().collect::<Vec<_>>(),"account":a.account,"pending":a.workspace.pending.len(),"blocked":a.workspace.pending.iter().any(|p|p.status!="queued"),"lastSync":a.workspace.last_sync,"shortcutError":a.shortcut_error,"preferences":a.store.config("preferences").and_then(|s|serde_json::from_str::<Value>(&s).ok()).unwrap_or(json!({}))})
+    json!({"entities":a.workspace.snapshot.entities.values().collect::<Vec<_>>(),"account":a.account,"cloudAvailable":keychain::cloud_available(),"pending":a.workspace.pending.len(),"blocked":a.workspace.pending.iter().any(|p|p.status!="queued"),"lastSync":a.workspace.last_sync,"shortcutError":a.shortcut_error,"preferences":a.store.config("preferences").and_then(|s|serde_json::from_str::<Value>(&s).ok()).unwrap_or(json!({}))})
 }
 fn save(a: &mut App, w: Workspace) -> Result<(), String> {
     a.store.save(&a.account, &w)?;
@@ -133,6 +133,7 @@ async fn connect(
     progress: tauri::ipc::Channel<cloud::TransferProgress>,
     state: State<'_, Shared>,
 ) -> Result<Value, String> {
+    keychain::require_cloud()?;
     let _connection = state.1.lock().await;
     let email = email.trim().to_lowercase();
     if email.is_empty() || !email.contains('@') {
@@ -206,6 +207,7 @@ async fn sync(state: State<'_, Shared>) -> Result<Value, String> {
         }
         (a.account.clone(), a.workspace.clone())
     };
+    keychain::require_cloud()?;
     let (password, history) = credentials(&email)?;
     let mut remote = workflow::LiveRemote {
         email: &email,
@@ -238,6 +240,7 @@ async fn sync_workspace<R: workflow::Remote>(
 }
 #[tauri::command]
 async fn resolve_drafts(confirm: bool, state: State<'_, Shared>) -> Result<Value, String> {
+    keychain::require_cloud()?;
     if !confirm {
         return Err("Confirm that the cloud version should replace pending edits".into());
     }
@@ -294,7 +297,12 @@ pub fn run() {
             }
             let store =
                 Store::open(&path.join("workspace.sqlite")).map_err(std::io::Error::other)?;
-            let account = store.config("account").unwrap_or("local".into());
+            // A local preview leaves the saved Cloud account and its workspace intact.
+            let account = if keychain::cloud_available() {
+                store.config("account").unwrap_or("local".into())
+            } else {
+                "local".into()
+            };
             let workspace = store.load(&account).map_err(std::io::Error::other)?;
             let shortcut = store
                 .config("preferences")
