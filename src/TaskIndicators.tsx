@@ -132,7 +132,6 @@ export function EveningIcon(props: { size?: number; class?: string }) {
 }
 
 export function SettingsIcon(props: { size?: number }) {
-  // Same settings glyph as Samlad's options menu.
   return (
     <svg
       class="settings-icon"

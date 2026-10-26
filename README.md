@@ -40,8 +40,7 @@ projects and newer opaque repeaters still require Things. Reminders created in
 Somedue are local and do not sync to other devices.
 
 Only macOS is supported. Things Cloud access uses an unofficial protocol, and the
-app is not notarized. See the [verification record](VERIFICATION.md) for the checks
-performed on the current build.
+app is not notarized. Test it with nonessential data before relying on it.
 
 ## Run from source
 
@@ -94,8 +93,8 @@ certificate, it produces an ad-hoc local build that cannot save Cloud credential
 
 You can also store the fingerprint in
 `~/Library/Application Support/Somedue/macos-signing-identity`.
-[Signing and Keychain implementation details](docs/samlad-reference.md) explain the
-native credential boundary.
+For a signed release, the credential helper verifies the app before handling
+credentials and does not expose them through command arguments or logs.
 
 ## Development
 
@@ -110,7 +109,7 @@ offer a `plain` variant for writing surfaces. Their `class` props use
 `tailwind-merge`, so caller utilities can override defaults without CSS overrides.
 Use `Button align="content"` to align its contents while preserving hover padding.
 `NavigationItem` and `ListHeading` share navigation geometry and list hierarchy.
-`UnderlineTab` follows Samlad's serif tabs and growing active underline.
+`UnderlineTab` uses serif labels and a growing active underline.
 Use `Field`, `Dialog`, `Select`, `Menu`, `Checkbox`, `Kbd`, and `SectionHeading`
 for the corresponding shared UI patterns.
 
@@ -151,10 +150,9 @@ installed-app check reads the fingerprint from the identity file described above
 
 ## Contributing
 
-Bug reports and focused pull requests are welcome. Before starting a larger
-change, [open an issue](https://github.com/Heartkemy/somedue/issues) to discuss it.
-For bugs, include your macOS version, the steps to reproduce the problem, and what
-you expected. Keep account credentials and personal task data out of reports.
+Bug reports and focused pull requests are welcome. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report security
+vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 

@@ -2,7 +2,6 @@ import { splitProps } from "solid-js";
 import { twMerge } from "tailwind-merge";
 import { Button, type ButtonProps } from "./Button";
 
-// Samlad's underline-tabs and queue-view-tabs, mapped to the Tailwind theme scale.
 export function UnderlineTab(props: ButtonProps) {
   const [local, rest] = splitProps(props, ["class"]);
   return (

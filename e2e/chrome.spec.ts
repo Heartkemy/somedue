@@ -30,7 +30,7 @@ test("pointer focus stays quiet; keyboard focus, scroll indicators and sidebar c
     "keyboard",
   );
   await page.screenshot({
-    path: info.outputPath("samlad-options-menu.png"),
+    path: info.outputPath("options-menu.png"),
     animations: "disabled",
   });
   await page.keyboard.press("Escape");

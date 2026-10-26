@@ -81,7 +81,7 @@ for (const [theme, width] of [
       });
     });
 
-    test("Upcoming uses Samlad typography and an active underline that grows on hover", async ({
+    test("Upcoming uses shared typography and an active underline that grows on hover", async ({
       page,
     }, info) => {
       await page.getByRole("button", { name: "Upcoming", exact: true }).click();

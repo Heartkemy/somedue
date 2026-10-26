@@ -1,10 +1,10 @@
-// RoboLabs source timings/physics: docs/motion-reference.json. Native WAAPI, no runtime dependency.
+// Native WAAPI motion with bounded, reduced-motion-aware timing.
 function spring(stiffness: number, damping: number, duration?: number) {
   const omega = Math.sqrt(stiffness),
     zeta = damping / (2 * omega);
   const response = (t: number) => {
     if (duration) {
-      // Zero-bounce duration spring: (1+x)e^-x settles to the source restDelta .001.
+      // Zero-bounce duration spring settling at 0.1% remaining motion.
       let x = 5;
       for (let i = 0; i < 11; i++)
         x -= ((1 + x) * Math.exp(-x) - 0.001) / (-x * Math.exp(-x));

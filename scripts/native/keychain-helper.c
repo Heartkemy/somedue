@@ -1,5 +1,4 @@
-// Adapted from Samlad's signed, cached helper architecture. The password itself
-// is stored in Keychain. No terminal/shell output path is accepted.
+// Only the verified bundled app may use this helper. Passwords stay in Keychain.
 #include <Security/Security.h>
 #include <sys/socket.h>
 #include <sys/un.h>
