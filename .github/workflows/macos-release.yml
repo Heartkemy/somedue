@@ -1,0 +1,68 @@
+name: macOS package rehearsal
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+      - "rehearsal-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: 1.4.3
+  RUST_VERSION: 1.99.1
+  CARGO_TARGET_DIR: ${{ github.workspace }}/.cargo-target
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Apple Silicon preview
+            runner: macos-15
+            target: aarch64-apple-darwin
+            arch: arm64
+          - name: Intel preview
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # 1.99.1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.CARGO_TARGET_DIR }}
+          key: ${{ runner.os }}-${{ runner.arch }}-macos-package-${{ env.BUN_VERSION }}-${{ env.RUST_VERSION }}-${{ hashFiles('bun.lock', 'src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-macos-package-${{ env.BUN_VERSION }}-${{ env.RUST_VERSION }}-
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+      - run: rustup target add "${{ matrix.target }}"
+      - run: bun test tests/macos-package.test.mjs tests/macos-lipo.test.mjs tests/homebrew-cask.test.mjs tests/macos-release-workflow.test.mjs
+      - run: SOMEDUE_CODESIGN_IDENTITY=- bun scripts/macos-package.mjs --target "${{ matrix.target }}" --dmg
+      - run: bun scripts/homebrew-cask.mjs --check-receipt "out/macos/ad-hoc/${{ matrix.arch }}/build-receipt.json"
+
+# This workflow deliberately has no upload-artifact, release, or publishing step.

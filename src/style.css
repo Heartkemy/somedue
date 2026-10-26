@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/* The palette and fonts are the app's Tailwind theme; geometry uses its default scale. */
+@theme {
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-bg: #191614;
+  --color-surface: #262019;
+  --color-ink: #fff2df;
+  --color-muted: #bab0a3;
+  --color-quiet: #958b7f;
+  --color-accent: #ffc200;
+  --color-mint: #00ffd0;
+  --color-orchid: #d400ff;
+  --color-project: #dc00ff;
+  --color-hover: #ffffff0b;
+  --color-field: #1f1a15;
+  --color-selection: #ffc20015;
+  --color-danger: #ff9789;
+  --color-highlight: #ffc200;
+  --color-on-highlight: #241c14;
+  --color-deadline: #d2ac69;
+  --color-upcoming: #b9a0df;
+  --color-anytime: #77b7b1;
+  --color-someday: #cfa77a;
+  --color-sidebar-start: #211a13;
+  --color-sidebar-end: #171412;
+  --color-editor-start: #2c251e;
+  --color-editor-end: #221d19;
+}
+
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+@custom-variant compact (&:where([data-density="compact"] *));
+@custom-variant keyboard-input (&:where(html[data-input-modality="keyboard"] *));
+
+@layer base {
+  [data-theme="light"] {
+    --color-bg: #fbf7ef;
+    --color-surface: #f0e9dd;
+    --color-ink: #30251c;
+    --color-muted: #6d6054;
+    --color-quiet: #7c6d60;
+    --color-accent: #966900;
+    --color-mint: #00715d;
+    --color-orchid: #8c22b5;
+    --color-project: #dc00ff;
+    --color-hover: #30251c09;
+    --color-field: #e9e1d5;
+    --color-selection: #ffc20028;
+    --color-danger: #a93628;
+    --color-sidebar-start: #eee7dd;
+    --color-sidebar-end: #f3ede4;
+    --color-editor-start: var(--color-surface);
+    --color-editor-end: var(--color-surface);
+  }
+
+  :root {
+    @apply bg-bg font-sans text-ink antialiased [font-synthesis:none] [text-rendering:optimizeLegibility];
+  }
+  html,
+  body,
+  #root {
+    @apply h-full overflow-hidden;
+  }
+  body {
+    @apply text-sm;
+  }
+
+  /* Focus policy also covers native/third-party focus targets without a component class. */
+  :is(button, input, textarea, select, summary, [tabindex]):not(
+      [popover]
+    ):focus-visible {
+    @apply outline-none ring-2 ring-mint ring-offset-2 ring-offset-bg;
+  }
+  html[data-input-modality="pointer"]
+    :is(button, input, textarea, select, summary, [tabindex]):not(
+      [popover]
+    ):focus {
+    @apply outline-none! [box-shadow:none]!;
+  }
+
+  /* Browser-owned scrollbars require global pseudo-element selectors. */
+  * {
+    @apply [scrollbar-color:transparent_transparent];
+  }
+  ::-webkit-scrollbar {
+    @apply size-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-transparent transition-colors;
+  }
+  [data-scrolling="true"] {
+    @apply [scrollbar-color:var(--color-quiet)_transparent];
+  }
+  [data-scrolling="true"]::-webkit-scrollbar-thumb {
+    @apply bg-quiet/40;
+  }
+
+  /* Global accessibility preferences must include pseudo-elements and future/native controls. */
+  [data-motion="off"] *,
+  [data-motion="off"] *::before,
+  [data-motion="off"] *::after {
+    @apply animate-none! transition-none! scroll-auto!;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      @apply animate-none! transition-none! scroll-auto!;
+    }
+  }
+}
