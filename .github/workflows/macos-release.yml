@@ -64,7 +64,7 @@ jobs:
       - run: bun test tests/macos-package.test.mjs tests/macos-lipo.test.mjs tests/homebrew-cask.test.mjs tests/macos-release-workflow.test.mjs
       - run: SOMEDUE_CODESIGN_IDENTITY=- bun scripts/macos-package.mjs --target "${{ matrix.target }}" --dmg
       - run: bun scripts/homebrew-cask.mjs --check-receipt "out/macos/ad-hoc/${{ matrix.arch }}/build-receipt.json"
-      - if: startsWith(github.ref, 'refs/tags/v')
+      - if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-${{ matrix.arch }}

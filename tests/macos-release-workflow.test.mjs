@@ -35,6 +35,6 @@ test("macOS packaging is native, pinned, and retains artifacts only for version 
   );
   assert.match(
     workflow,
-    /if: startsWith\(github.ref, 'refs\/tags\/v'\)\n\s+uses: actions\/upload-artifact@[a-f0-9]{40}/,
+    /if: github.event_name == 'push' && startsWith\(github.ref, 'refs\/tags\/v'\)\n\s+uses: actions\/upload-artifact@[a-f0-9]{40}/,
   );
 });
