@@ -3289,7 +3289,7 @@ dependencies = [
 name = "somedue"
 version = "0.1.1-alpha.1"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "bs58",
  "chrono",
  "crc32fast",
