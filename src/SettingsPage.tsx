@@ -73,7 +73,7 @@ export default function SettingsPage(props: {
   const sections: Record<string, string> = {
     General: "Capture, sync & Quick Entry",
     Appearance: "Theme, spacing & motion",
-    "Things Cloud": "Account, sync & recovery",
+    "Things Cloud": "Account & automatic sync",
     Tags: "Organize your to-dos",
     Keyboard: "Shortcuts & navigation",
     About: "Somedue on this computer",
@@ -310,13 +310,19 @@ export default function SettingsPage(props: {
                         ? `Last sync ${new Date(state().lastSync!).toLocaleString()}`
                         : "Not yet synced"}
                     </span>
-                    <span>{state().pending} pending edits</span>
+                    <span role="status">
+                      {props.syncing
+                        ? "Syncing your changes…"
+                        : state().pending
+                          ? `${state().pending} ${state().pending === 1 ? "change saved" : "changes saved"} on this Mac. ${pref("autoSync", true) ? "Sync will continue automatically." : "Automatic sync is off."}`
+                          : "All changes synced"}
+                    </span>
                     <Button
                       onClick={() => void props.sync()}
                       disabled={props.syncing}
                     >
                       <RefreshCw size={15} />
-                      Sync now
+                      {props.syncing ? "Syncing…" : "Sync now"}
                     </Button>
                     <Button
                       onClick={() =>
@@ -345,33 +351,6 @@ export default function SettingsPage(props: {
                   Signing in opens your cloud workspace. Your local to-dos
                   remain saved separately.
                 </p>
-              </Show>
-              <Show when={state().blocked}>
-                <div class="settings-group mt-8 border-t border-quiet/15 pt-5.5 [&>button]:flex [&>button]:justify-start [&>button]:text-xs [&>button]:text-accent">
-                  <h4>Sync recovery</h4>
-                  <p>
-                    A change may conflict with another device or have an
-                    unconfirmed server response. Pending edits are preserved and
-                    will not be resent automatically.
-                  </p>
-                  <Button onClick={() => void exportData()}>
-                    Export drafts first
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      ask(
-                        "Replace pending drafts with the current cloud version? A recovery copy will be retained in your local backup.",
-                        async () => {
-                          setState(
-                            await call("resolve_drafts", { confirm: true }),
-                          );
-                        },
-                      )
-                    }
-                  >
-                    Use cloud version
-                  </Button>
-                </div>
               </Show>
             </Show>
           </Show>

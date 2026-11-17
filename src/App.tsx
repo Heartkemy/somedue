@@ -28,6 +28,7 @@ import {
   RotateCw,
   MoreHorizontal,
   RefreshCw,
+  AlertCircle,
   Pause,
   Play,
   Folder,
@@ -167,7 +168,8 @@ export default function App() {
     [creating, setCreating] = createSignal<string | null>(null),
     [menu, setMenu] = createSignal(false),
     [moving, setMoving] = createSignal(false),
-    [error, setError] = createSignal(""),
+    [error, writeError] = createSignal(""),
+    [syncIssue, setSyncIssue] = createSignal(false),
     [notice, setNotice] = createSignal(""),
     [busy, setBusy] = createSignal(false),
     [loading, setLoading] = createSignal(true),
@@ -737,9 +739,17 @@ export default function App() {
     clearTimeout(noticeTimer);
     noticeTimer = setTimeout(() => setNotice(""), 4000);
   };
+  const reconnectSync = () =>
+    syncIssue() && /authentication|reconnect|password/i.test(error());
+  function setError(message: string, syncing = false) {
+    batch(() => {
+      setSyncIssue(syncing);
+      writeError(message);
+    });
+  }
   async function run<T>(fn: () => Promise<T>): Promise<T | undefined> {
     try {
-      setError("");
+      if (!syncIssue()) setError("");
       return await fn();
     } catch (e) {
       setError(String(e));
@@ -754,10 +764,14 @@ export default function App() {
     }
     setBusy(true);
     const startedAt = mutationVersion;
-    const synced = await run(async () => {
+    let synced = false;
+    try {
       applyIncoming(await call("sync"));
-      return true;
-    });
+      setError("");
+      synced = true;
+    } catch (e) {
+      setError(String(e), state().account !== "local");
+    }
     if (native()) {
       try {
         setState(await call("load"));
@@ -1323,9 +1337,9 @@ export default function App() {
         )
           setConnectionOpen(true);
       }).finally(() => setLoading(false));
-      void listen<string>("sync-error", (e) => setError(e.payload)).then(
-        (f) => (unlistenSyncError = f),
-      );
+      void listen<string>("sync-error", (e) => {
+        setError(e.payload, true);
+      }).then((f) => (unlistenSyncError = f));
       void listen("workspace-changed", () => {
         if (!editing()) void run(async () => applyIncoming(await call("load")));
       }).then((f) => (unlistenWorkspace = f));
@@ -1735,26 +1749,23 @@ export default function App() {
               >
                 <div class="menu-connection grid grid-cols-[--spacing(3.5)_1fr] items-center gap-2 px-3 pt-2.5 pb-3 [&>strong]:text-xs [&>strong]:font-medium [&>span:last-child]:col-start-2 [&>span:last-child]:text-xs [&>span:last-child]:leading-5 [&>span:last-child]:text-muted">
                   <span
-                    class="menu-status-mark size-1.5 rounded-full bg-mint ring-4 ring-mint/15 [&.pending]:bg-accent [&.blocked]:bg-danger"
+                    class="menu-status-mark size-1.5 rounded-full bg-mint ring-4 ring-mint/15 [&.pending]:bg-accent"
                     classList={{
                       pending: busy() || !!state().pending,
-                      blocked: state().blocked,
                     }}
                   />
                   <strong>
-                    {state().blocked
-                      ? "Sync needs attention"
-                      : busy()
-                        ? "Syncing…"
-                        : state().account === "local"
-                          ? "Saved on this Mac"
-                          : "Things Cloud"}
+                    {busy()
+                      ? "Syncing…"
+                      : state().account === "local"
+                        ? "Saved on this Mac"
+                        : "Things Cloud"}
                   </strong>
                   <span>
                     {state().account === "local"
                       ? "Your tasks are stored on this computer."
                       : state().pending
-                        ? `${state().pending} pending changes`
+                        ? `${state().pending} ${state().pending === 1 ? "change saved" : "changes saved"} on this Mac, waiting to sync.`
                         : "Your tasks are saved on this computer and connected to Things Cloud."}
                   </span>
                 </div>
@@ -1860,13 +1871,77 @@ export default function App() {
           </Show>
           <Show when={error()}>
             <div
-              role="alert"
-              class="notice error mx-6 mb-2.5 flex items-start justify-between rounded-lg px-4 py-3 text-xs leading-relaxed bg-danger/10 text-danger"
+              role={syncIssue() ? "status" : "alert"}
+              aria-live={syncIssue() ? "polite" : "assertive"}
+              class="notice error mx-7 mt-14 mb-2 flex shrink-0 items-start gap-3 rounded-xl bg-surface p-4 text-sm leading-relaxed text-ink"
             >
-              <span>{error()}</span>
+              <Show
+                when={syncIssue()}
+                fallback={
+                  <AlertCircle size={18} class="mt-0.5 shrink-0 text-danger" />
+                }
+              >
+                <RefreshCw
+                  size={18}
+                  class="mt-0.5 shrink-0 text-accent"
+                  classList={{ "animate-spin": busy() }}
+                />
+              </Show>
+              <div class="min-w-0 flex-1">
+                <p class="font-medium">
+                  {syncIssue()
+                    ? reconnectSync()
+                      ? "Reconnect Things Cloud"
+                      : busy()
+                        ? "Syncing your changes…"
+                        : "Changes saved on this Mac"
+                    : "Couldn’t finish that action"}
+                </p>
+                <Show
+                  when={syncIssue()}
+                  fallback={
+                    <p class="mt-1 text-muted wrap-anywhere">{error()}</p>
+                  }
+                >
+                  <p class="mt-1 max-w-prose text-muted">
+                    {reconnectSync()
+                      ? "Your changes are saved on this Mac. Reconnect your account to continue syncing."
+                      : pref("autoSync", true)
+                        ? "Things Cloud hasn’t confirmed every change yet. Somedue will keep trying automatically. You can keep working."
+                        : "Things Cloud hasn’t confirmed every change yet. Automatic sync is off; choose Try syncing now when you’re ready."}
+                  </p>
+                  <div class="mt-3 flex flex-wrap items-start gap-x-4 gap-y-2">
+                    <Button
+                      size="small"
+                      onClick={() =>
+                        reconnectSync()
+                          ? setConnectionOpen(true)
+                          : void refresh()
+                      }
+                      disabled={busy()}
+                    >
+                      {reconnectSync()
+                        ? "Reconnect account"
+                        : "Try syncing now"}
+                    </Button>
+                    <details class="min-w-0 flex-1 text-xs text-muted">
+                      <summary class="w-fit cursor-pointer rounded-md py-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mint">
+                        Technical details
+                      </summary>
+                      <p class="mt-1 max-h-32 max-w-prose overflow-y-auto pr-2 wrap-anywhere">
+                        {error()}
+                      </p>
+                    </details>
+                  </div>
+                </Show>
+              </div>
               <IconButton
+                size="small"
+                variant="quiet"
                 aria-label="Dismiss error"
-                onClick={() => setError("")}
+                onClick={() => {
+                  setError("");
+                }}
               >
                 <X size={16} />
               </IconButton>
@@ -2087,7 +2162,7 @@ export default function App() {
                   fallback={
                     <div
                       class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
-                      classList={{ "symbol-only": !query() }}
+                      classList={{ "symbol-only": !query() && !error() }}
                       role="status"
                       aria-label={
                         query()
@@ -2548,7 +2623,7 @@ export default function App() {
               </Show>
             </footer>
           </Show>
-          <Show when={notice()}>
+          <Show when={notice() && !error()}>
             <div
               role="status"
               class="toast floating-surface z-100 order-1 mx-6 mb-3 flex w-95 max-w-[calc(100%_-_--spacing(8))] shrink-0 items-start gap-3 self-end rounded-xl bg-ink/7 p-4 text-sm leading-relaxed text-ink shadow-xl backdrop-blur-xl [&>p]:min-w-0 [&>p]:flex-1 [&>p]:pt-0.5 [&>p]:wrap-anywhere [&_svg]:text-mint [&_.icon-button_svg]:text-muted"
