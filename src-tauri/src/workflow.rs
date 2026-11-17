@@ -81,9 +81,11 @@ fn postcondition_met(pending: &Pending, remote: &Snapshot) -> bool {
                 return false;
             };
             entity.kind == event["e"].as_str().unwrap_or("")
-                && event["p"]
-                    .as_object()
-                    .is_some_and(|p| p.iter().all(|(k, v)| entity.props.get(k) == Some(v)))
+                && event["p"].as_object().is_some_and(|p| {
+                    p.iter()
+                        .filter(|(k, _)| k.as_str() != "md")
+                        .all(|(k, v)| entity.props.get(k) == Some(v))
+                })
         })
 }
 
@@ -396,6 +398,20 @@ mod tests {
             workspace.authoritative.unwrap().entities[&id].props["tt"],
             "Draft"
         );
+    }
+    #[tokio::test]
+    async fn already_applied_edit_ignores_remote_modification_timestamp() {
+        let (w, id) = fixture();
+        let mut workspace = edit(&w, &id, "Already saved");
+        workspace.pending[0].status = "review".into();
+        let mut actual = workspace.snapshot.clone();
+        actual.entities.get_mut(&id).unwrap().props["md"] = json!(42.0);
+        let mut remote = FakeRemote::new(vec![actual], vec![]);
+        sync(&mut remote, HISTORY, &mut workspace, |_| Ok(()))
+            .await
+            .unwrap();
+        assert!(workspace.pending.is_empty());
+        assert_eq!(remote.commit_calls, 0);
     }
     #[tokio::test]
     async fn initial_pull_failure_does_not_block_or_modify_drafts() {
