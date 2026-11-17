@@ -1,4 +1,5 @@
-import { Show, type JSX } from "solid-js";
+import { type JSX } from "@solidjs/web";
+import { Show } from "solid-js";
 import {
   ArrowRight,
   CalendarDays,
@@ -13,7 +14,7 @@ import {
   Tag,
   Trash2,
   X,
-} from "lucide-solid";
+} from "@lucide/solid";
 import { Kbd, Menu, MenuDivider, MenuItem, MenuSubmenu } from "./ui";
 
 export type TaskAction =

@@ -1,6 +1,6 @@
 # macOS previews and the maintainer tap
 
-Alpha 1 is a local-only preview, signed ad-hoc and not notarized. It cannot
+Alpha 2 is a local-only preview, signed ad-hoc and not notarized. It cannot
 connect to Things Cloud or save its credentials. Source development builds keep
 the experimental Cloud integration; certificate-signed source builds retain the
 existing Keychain boundary.
@@ -35,8 +35,8 @@ are separate builds and may have different bytes from locally built packages.
 
 Publish a prerelease only after the final source and exact intended files are
 verified. Create it as a draft, upload both DMGs, notices and `SHA256SUMS`, verify
-the asset set, then publish. Keep versioned assets immutable. The Alpha 1 tag is
-`v0.1.1-alpha.1`; the app and Cask version is `0.1.1-alpha.1`.
+the asset set, then publish. Keep versioned assets immutable. The Alpha 2 tag is
+`v0.1.1-alpha.2`; the app and Cask version is `0.1.1-alpha.2`.
 
 ## Maintainer-owned Homebrew Cask
 
@@ -47,9 +47,9 @@ artifacts that can access Cloud or save credentials.
 ```sh
 bun scripts/homebrew-cask.mjs \
   --arm-receipt out/macos/ad-hoc/arm64/build-receipt.json \
-  --arm-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.1/Somedue-0.1.1-alpha.1-arm64.dmg \
+  --arm-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.2/Somedue-0.1.1-alpha.2-arm64.dmg \
   --intel-receipt out/macos/ad-hoc/x86_64/build-receipt.json \
-  --intel-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.1/Somedue-0.1.1-alpha.1-x86_64.dmg \
+  --intel-url https://github.com/Heartkemy/somedue/releases/download/v0.1.1-alpha.2/Somedue-0.1.1-alpha.2-x86_64.dmg \
   --output out/macos/cask/Casks/somedue.rb
 ```
 

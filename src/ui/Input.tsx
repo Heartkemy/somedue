@@ -1,5 +1,6 @@
-import { createEffect, onMount, splitProps, type JSX } from "solid-js";
-import { twMerge } from "tailwind-merge";
+import { type JSX } from "@solidjs/web";
+import { createEffect, onSettled, omit } from "solid-js";
+import { classes } from "./classes";
 
 const inputClasses =
   "min-w-0 w-full rounded-lg border-0 bg-field px-3 py-2 text-sm leading-6 tracking-tight text-ink caret-mint outline-none placeholder:text-quiet transition-colors duration-200 hover:bg-hover disabled:opacity-50 [color-scheme:dark] light:[color-scheme:light]";
@@ -8,11 +9,12 @@ type InputStyle = { class?: string; variant?: "field" | "plain" };
 export function Input(
   props: JSX.InputHTMLAttributes<HTMLInputElement> & InputStyle,
 ) {
-  const [local, rest] = splitProps(props, ["class", "variant"]);
+  const local = props,
+    rest = omit(props, "class", "variant");
   return (
     <input
       {...rest}
-      class={twMerge(
+      class={classes(
         inputClasses,
         "min-h-10",
         local.variant === "plain" &&
@@ -27,13 +29,8 @@ export function Textarea(
   props: JSX.TextareaHTMLAttributes<HTMLTextAreaElement> &
     InputStyle & { autosize?: boolean },
 ) {
-  const [local, rest] = splitProps(props, [
-    "class",
-    "variant",
-    "autosize",
-    "onInput",
-    "ref",
-  ]);
+  const local = props,
+    rest = omit(props, "class", "variant", "autosize", "onInput", "ref");
   let element!: HTMLTextAreaElement;
   const resize = () => {
     if (!local.autosize || !element?.isConnected) return;
@@ -41,11 +38,11 @@ export function Textarea(
     element.style.height = "auto";
     element.style.height = `${element.scrollHeight}px`;
   };
-  onMount(resize);
-  createEffect(() => {
-    void props.value;
-    queueMicrotask(resize);
-  });
+  onSettled(resize);
+  createEffect(
+    () => props.value,
+    () => queueMicrotask(resize),
+  );
   return (
     <textarea
       {...rest}
@@ -59,7 +56,7 @@ export function Textarea(
         else if (Array.isArray(handler)) handler[0](handler[1], event);
         resize();
       }}
-      class={twMerge(
+      class={classes(
         inputClasses,
         local.autosize ? "resize-none" : "resize-y",
         local.variant === "plain" &&

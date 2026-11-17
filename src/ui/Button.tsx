@@ -1,5 +1,6 @@
-import { splitProps, type JSX } from "solid-js";
-import { twMerge } from "tailwind-merge";
+import { type JSX } from "@solidjs/web";
+import { omit } from "solid-js";
+import { classes } from "./classes";
 
 export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
   size?: "regular" | "small" | "compact";
@@ -30,15 +31,16 @@ const variants = {
 };
 
 export function Button(props: ButtonProps) {
-  const [local, rest] = splitProps(props, [
-    "class",
-    "size",
-    "variant",
-    "iconOnly",
-    "align",
-    "onClick",
-    "classList",
-  ]);
+  const local = props,
+    rest = omit(
+      props,
+      "class",
+      "size",
+      "variant",
+      "iconOnly",
+      "align",
+      "onClick",
+    );
   const size = () => local.size || "regular";
   const variant = () => local.variant || "secondary";
   return (
@@ -54,7 +56,7 @@ export function Button(props: ButtonProps) {
       }}
       data-size={size()}
       data-variant={variant()}
-      class={twMerge(
+      class={classes(
         "inline-flex shrink-0 cursor-pointer items-center justify-center border-0 text-inherit tracking-tight transition-colors duration-200 ease-in-out active:scale-98 disabled:cursor-default disabled:opacity-45 motion-reduce:transition-none [&>svg]:shrink-0",
         local.iconOnly
           ? `control-button icon-button ${iconSizes[size()]} p-1 gap-0`
@@ -66,7 +68,6 @@ export function Button(props: ButtonProps) {
           { regular: "-ml-4", small: "-ml-3", compact: "-ml-2" }[size()],
         local.class,
       )}
-      classList={local.classList}
     />
   );
 }

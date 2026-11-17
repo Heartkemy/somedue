@@ -1,6 +1,6 @@
 import { Input } from "./ui";
 import { createSignal, createMemo, For, Show } from "solid-js";
-import { Tag, Plus, X } from "lucide-solid";
+import { Tag, Plus, X } from "@lucide/solid";
 import { Button, Checkbox, IconButton, Pill } from "./ui";
 import { Popover } from "./Popover";
 import { title, type Entity } from "./model";

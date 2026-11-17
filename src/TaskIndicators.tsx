@@ -13,7 +13,7 @@ import {
   Star,
   Tag,
   Trash2,
-} from "lucide-solid";
+} from "@lucide/solid";
 import { Pill } from "./ui";
 import {
   isProject,
@@ -28,7 +28,7 @@ import {
   related,
   type Entity,
 } from "./model";
-import { Dynamic } from "solid-js/web";
+import { Dynamic } from "@solidjs/web";
 
 export function ListIcon(props: { name: string; size?: number }) {
   const icons = {
@@ -262,8 +262,10 @@ export function TaskDeadline(props: { value: number }) {
             });
   return (
     <span
-      class="deadline ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap pl-3 text-xs text-deadline [&.overdue]:text-danger"
-      classList={{ overdue: days() < 0 }}
+      class={[
+        "deadline ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap pl-3 text-xs text-deadline [&.overdue]:text-danger",
+        { overdue: days() < 0 },
+      ]}
       title={`Deadline ${new Date(props.value * 1000).toLocaleDateString("en", { dateStyle: "long", timeZone: "UTC" })}`}
     >
       <Flag size={13} fill="currentColor" />

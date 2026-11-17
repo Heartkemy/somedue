@@ -1,17 +1,16 @@
 import { Input, Textarea, Kbd, WindowedList } from "./ui";
 import {
+  flush,
   createSignal,
   createMemo,
   createEffect,
-  on,
   For,
   Show,
-  onMount,
+  onSettled,
   onCleanup,
-  batch,
 } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
-import { Portal } from "solid-js/web";
+import { createStore, reconcile } from "solid-js";
+import { Portal } from "@solidjs/web";
 import TagPicker from "./TagPicker";
 import DatePicker from "./DatePicker";
 import { Popover } from "./Popover";
@@ -38,7 +37,7 @@ import {
   ListChecks,
   FileText,
   GripHorizontal,
-} from "lucide-solid";
+} from "@lucide/solid";
 import TaskRow from "./TaskRow";
 import SettingsPage from "./SettingsPage";
 import TaskMenu, { type TaskAction } from "./TaskMenu";
@@ -202,7 +201,7 @@ export default function App() {
   const selectedIds = createMemo(() => new Set(selection()));
   let selectionAnchor = "";
   function setSelected(id: string) {
-    batch(() => {
+    flush(() => {
       setFocused(id);
       setSelection(id ? [id] : []);
     });
@@ -216,10 +215,8 @@ export default function App() {
       item.id,
       { toggle: e.metaKey || e.ctrlKey, range: e.shiftKey },
     );
-    batch(() => {
-      setSelection(ids);
-      setFocused(ids.includes(item.id) ? item.id : ids.at(-1) || "");
-    });
+    setSelection(ids);
+    setFocused(ids.includes(item.id) ? item.id : ids.at(-1) || "");
     if (!e.shiftKey) selectionAnchor = item.id;
   }
   const selectedItems = () =>
@@ -392,7 +389,9 @@ export default function App() {
   }
   const [editorFooter, setEditorFooter] = createSignal<HTMLDivElement>();
   function setState(input: State | ((previous: State) => State)) {
-    setRawState((previous) => {
+    // IPC callers read preferences and derived lists immediately after applying a snapshot.
+    flush(() => {
+      const previous = state();
       const next = typeof input === "function" ? input(previous) : input;
       if (!loading() && next.account === previous.account) {
         const seen = new Set(
@@ -407,7 +406,7 @@ export default function App() {
       const previousById = new Map(
         previous.entities.map((entity) => [entity.id, entity]),
       );
-      return {
+      setRawState({
         ...next,
         entities: next.entities.map((entity) => {
           const old = previousById.get(entity.id);
@@ -417,7 +416,7 @@ export default function App() {
             ? old
             : entity;
         }),
-      };
+      });
     });
   }
   function closeSettings() {
@@ -452,10 +451,8 @@ export default function App() {
     setDraftRevision((revision) => revision + 1);
   }
   function discardEditor() {
-    batch(() => {
-      if (currentEditor) releaseEditor(currentEditor);
-      setEditing("");
-    });
+    if (currentEditor) releaseEditor(currentEditor);
+    setEditing("");
   }
   function persistEditor(
     session: EditorSession<EditorDraft>,
@@ -706,29 +703,23 @@ export default function App() {
   const pref = (key: string, fallback: any) =>
     state().preferences[key] ?? fallback;
   createEffect(
-    on(
-      items,
-      (rows) => {
-        const visible = new Set(rows.map((item) => item.id));
-        const remaining = selection().filter((id) => visible.has(id));
-        if (remaining.length === selection().length) return;
-        batch(() => {
-          setSelection(remaining);
-          if (!visible.has(selected()) && editing() !== selected())
-            setFocused(remaining.at(-1) || "");
-        });
-      },
-      { defer: true },
-    ),
+    items,
+    (rows) => {
+      const visible = new Set(rows.map((item) => item.id));
+      const remaining = selection().filter((id) => visible.has(id));
+      if (remaining.length === selection().length) return;
+      setSelection(remaining);
+      if (!visible.has(selected()) && editing() !== selected())
+        setFocused(remaining.at(-1) || "");
+    },
+    { defer: true },
   );
   createEffect(
-    on(
-      editing,
-      (id) => {
-        if (!id && state().pending) scheduleSync();
-      },
-      { defer: true },
-    ),
+    editing,
+    (id) => {
+      if (!id && state().pending) scheduleSync();
+    },
+    { defer: true },
   );
   const toast = (text: string) => {
     setNotice(text);
@@ -742,10 +733,8 @@ export default function App() {
   const reconnectSync = () =>
     syncIssue() && /authentication|reconnect|password/i.test(error());
   function setError(message: string, syncing = false) {
-    batch(() => {
-      setSyncIssue(syncing);
-      writeError(message);
-    });
+    setSyncIssue(syncing);
+    writeError(message);
   }
   async function run<T>(fn: () => Promise<T>): Promise<T | undefined> {
     try {
@@ -880,19 +869,17 @@ export default function App() {
       toast("Save or close the open to-do first.");
       return;
     }
-    batch(() => {
-      setSettings(false);
-      setRecentItems((ids) =>
-        [id, ...ids.filter((value) => value !== id)].slice(0, 8),
-      );
-      setList(id);
-      setQuery("");
-      setTag("");
-      setShowLater(true);
-      setShowLogged(false);
-      setSelected("");
-      setMenu(false);
-    });
+    setSettings(false);
+    setRecentItems((ids) =>
+      [id, ...ids.filter((value) => value !== id)].slice(0, 8),
+    );
+    setList(id);
+    setQuery("");
+    setTag("");
+    setShowLater(true);
+    setShowLogged(false);
+    setSelected("");
+    setMenu(false);
   }
   function openItem(e: Entity) {
     if (editing() && editing() !== e.id) {
@@ -921,10 +908,8 @@ export default function App() {
     });
     const session = editorSaves.drafts.get(e.id);
     await editorSaves.enqueue(() => mutate(changes));
-    batch(() => {
-      if (session && currentEditor === session) setEditing("");
-      if (session) releaseEditor(session);
-    });
+    if (session && currentEditor === session) setEditing("");
+    if (session) releaseEditor(session);
   }
   async function remove(e: Entity) {
     if (isTemplate(e)) {
@@ -942,11 +927,9 @@ export default function App() {
       if (all().some((saved) => saved.id === e.id))
         await mutate(event(e, { tr: true }));
     });
-    batch(() => {
-      if (session && currentEditor === session) setEditing("");
-      if (session) releaseEditor(session);
-      if (draft()?.id === e.id) setDraft(null);
-    });
+    if (session && currentEditor === session) setEditing("");
+    if (session) releaseEditor(session);
+    if (draft()?.id === e.id) setDraft(null);
   }
   async function reorder(e: Entity, direction: number) {
     const arr = rowPeers(e),
@@ -1225,7 +1208,7 @@ export default function App() {
       openFind(e.key);
     }
   }
-  onMount(() => {
+  onSettled(() => {
     let handoffClick:
       { id: string; x: number; y: number; time: number } | undefined;
     const saveOutside = (e: MouseEvent) => {
@@ -1277,10 +1260,8 @@ export default function App() {
           time: e.timeStamp,
         };
         if (!isProject(item)) instantEditor = item.id;
-        batch(() => {
-          setSelected(item.id);
-          setEditing("");
-        });
+        setSelected(item.id);
+        setEditing("");
         return;
       }
       const previousEditor = currentEditor;
@@ -1368,7 +1349,7 @@ export default function App() {
         void run(async () => applyIncoming(await call("load")));
     }, 60000);
     const reminderInterval = setInterval(() => void checkReminders(), 15000);
-    onCleanup(() => {
+    return () => {
       document.removeEventListener("keydown", key);
       document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("click", saveOutside, true);
@@ -1380,7 +1361,7 @@ export default function App() {
       clearInterval(reminderInterval);
       clearTimeout(noticeTimer);
       clearTimeout(syncTimer);
-    });
+    };
   });
   function group(e: Entity) {
     if (query()) return "";
@@ -1408,17 +1389,21 @@ export default function App() {
   }
   const motion = installMotion(() => pref("motion", true));
   createEffect(
-    on([list, loading], ([, isLoading]) => {
+    () => [list(), loading()],
+    ([, isLoading]) => {
       if (!isLoading)
         queueMicrotask(() => {
           const page = document.querySelector(".list-page");
           if (page) motion.enter(page);
         });
-    }),
+    },
   );
-  createEffect(() => {
-    if (!pref("motion", true)) motion.cancel();
-  });
+  createEffect(
+    () => pref("motion", true),
+    (enabled) => {
+      if (!enabled) motion.cancel();
+    },
+  );
   onCleanup(() => motion.dispose());
   async function persistSidebarWidth(value: number) {
     const preferences = { ...state().preferences, sidebarWidth: value };
@@ -1452,13 +1437,15 @@ export default function App() {
     handle.addEventListener("pointercancel", end);
   }
   return (
-    <FeedbackContext.Provider value={error}>
+    <FeedbackContext value={error}>
       <div
-        class="app relative grid h-dvh grid-rows-[minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink"
-        classList={{
-          "grid-cols-1": !sidebar(),
-          "grid-cols-[var(--sidebar-width)_minmax(0,1fr)]": sidebar(),
-        }}
+        class={[
+          "app relative grid h-dvh grid-rows-[minmax(0,1fr)] bg-bg text-ink overflow-clip selection:bg-selection selection:text-ink",
+          {
+            "grid-cols-1": !sidebar(),
+            "grid-cols-[var(--sidebar-width)_minmax(0,1fr)]": sidebar(),
+          },
+        ]}
         style={{
           // The user can resize the sidebar continuously; only this measured width is dynamic.
           "--sidebar-width": `${sidebarWidth()}px`,
@@ -1525,8 +1512,11 @@ export default function App() {
                     return (
                       <NavigationItem
                         aria-label={name}
-                        class="nav-item [&:nth-child(2)]:mt-3.5 [&:nth-child(6)]:mt-3.5"
-                        classList={{ active: list() === name && !query() }}
+
+                        class={[
+                          "nav-item [&:nth-child(2)]:mt-3.5 [&:nth-child(6)]:mt-3.5",
+                          { active: list() === name && !query() },
+                        ]}
                         onClick={() => navigate(name)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
@@ -1594,7 +1584,9 @@ export default function App() {
                           variant="bare"
                           class="area-toggle absolute top-0 right-2 z-1 size-8 min-h-8 rounded p-1.5 text-quiet opacity-0 group-hover/area:opacity-100 keyboard-input:group-focus-within/area:opacity-100 hover:bg-transparent hover:text-ink"
                           aria-label={`${collapsed().includes(a.id) ? "Expand" : "Collapse"} ${title(a)}`}
-                          aria-expanded={!collapsed().includes(a.id)}
+                          aria-expanded={
+                            !collapsed().includes(a.id) ? "true" : "false"
+                          }
                           onClick={() =>
                             setCollapsed((v) =>
                               v.includes(a.id)
@@ -1610,8 +1602,10 @@ export default function App() {
                           )}
                         </Button>
                         <NavigationItem
-                          class="area-link pr-9 font-semibold group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection"
-                          classList={{ active: list() === a.id }}
+                          class={[
+                            "area-link pr-9 font-semibold group-hover/area:bg-hover [&.active]:group-hover/area:bg-selection",
+                            { active: list() === a.id },
+                          ]}
                           onClick={() => navigate(a.id)}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => dropIn(e, a)}
@@ -1713,14 +1707,14 @@ export default function App() {
                 onClick={() => void refresh()}
                 disabled={busy()}
               >
-                <RefreshCw size={16} classList={{ "animate-spin": busy() }} />
+                <RefreshCw size={16} class={busy() ? "animate-spin" : ""} />
               </IconButton>
               <IconButton
                 size="compact"
                 variant="quiet"
                 aria-label="List options"
                 aria-haspopup="true"
-                aria-expanded={menu()}
+                aria-expanded={menu() ? "true" : "false"}
                 onClick={() => {
                   setMenu((v) => !v);
                   if (menu())
@@ -1749,10 +1743,12 @@ export default function App() {
               >
                 <div class="menu-connection grid grid-cols-[--spacing(3.5)_1fr] items-center gap-2 px-3 pt-2.5 pb-3 [&>strong]:text-xs [&>strong]:font-medium [&>span:last-child]:col-start-2 [&>span:last-child]:text-xs [&>span:last-child]:leading-5 [&>span:last-child]:text-muted">
                   <span
-                    class="menu-status-mark size-1.5 rounded-full bg-mint ring-4 ring-mint/15 [&.pending]:bg-accent"
-                    classList={{
-                      pending: busy() || !!state().pending,
-                    }}
+                    class={[
+                      "menu-status-mark size-1.5 rounded-full bg-mint ring-4 ring-mint/15 [&.pending]:bg-accent",
+                      {
+                        pending: busy() || !!state().pending,
+                      },
+                    ]}
                   />
                   <strong>
                     {busy()
@@ -1883,8 +1879,8 @@ export default function App() {
               >
                 <RefreshCw
                   size={18}
-                  class="mt-0.5 shrink-0 text-accent"
-                  classList={{ "animate-spin": busy() }}
+
+                  class={`mt-0.5 shrink-0 text-accent ${busy() ? "animate-spin" : ""}`}
                 />
               </Show>
               <div class="min-w-0 flex-1">
@@ -2072,14 +2068,12 @@ export default function App() {
                           : visibleNewTasks()
                         ).map((item) => item.id),
                       );
-                      batch(() => {
-                        setNewTasks((previous) =>
-                          previous.filter((id) => !ids.has(id)),
-                        );
-                        setNewToday((previous) =>
-                          previous.filter((id) => !ids.has(id)),
-                        );
-                      });
+                      setNewTasks((previous) =>
+                        previous.filter((id) => !ids.has(id)),
+                      );
+                      setNewToday((previous) =>
+                        previous.filter((id) => !ids.has(id)),
+                      );
                     }}
                   >
                     OK
@@ -2093,13 +2087,13 @@ export default function App() {
                   aria-label="Upcoming view"
                 >
                   <UnderlineTab
-                    aria-pressed={upcomingCalendar()}
+                    aria-pressed={upcomingCalendar() ? "true" : "false"}
                     onClick={() => setUpcomingCalendar(true)}
                   >
                     Calendar
                   </UnderlineTab>
                   <UnderlineTab
-                    aria-pressed={!upcomingCalendar()}
+                    aria-pressed={!upcomingCalendar() ? "true" : "false"}
                     onClick={() => setUpcomingCalendar(false)}
                   >
                     Scheduled only
@@ -2161,8 +2155,10 @@ export default function App() {
                   }
                   fallback={
                     <div
-                      class="empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed"
-                      classList={{ "symbol-only": !query() && !error() }}
+                      class={[
+                        "empty flex min-h-80 flex-col items-center justify-center text-center text-quiet [&.symbol-only]:pointer-events-none [&.symbol-only]:absolute [&.symbol-only]:inset-0 [&.symbol-only]:min-h-0 [&.symbol-only_.empty-symbol]:m-0 [&.symbol-only_.empty-symbol]:size-21 [&>h2]:mb-3 [&>h2]:font-serif [&>h2]:text-3xl [&>h2]:font-medium [&>h2]:text-muted [&>p]:max-w-80 [&>p]:text-xs [&>p]:leading-relaxed",
+                        { "symbol-only": !query() && !error() },
+                      ]}
                       role="status"
                       aria-label={
                         query()
@@ -2791,7 +2787,7 @@ export default function App() {
           </Dialog>
         </Show>
       </div>
-    </FeedbackContext.Provider>
+    </FeedbackContext>
   );
   function dropIn(e: DragEvent, target: Entity) {
     e.preventDefault();
@@ -2825,13 +2821,12 @@ export default function App() {
   function ProjectNav(props: { p: Entity }) {
     return (
       <NavigationItem
-        class="project-nav"
         draggable="true"
         onDragStart={(e) => {
           e.stopPropagation();
           e.dataTransfer?.setData("text/plain", props.p.id);
         }}
-        classList={{ active: list() === props.p.id }}
+        class={["project-nav", { active: list() === props.p.id }]}
         onClick={() => navigate(props.p.id)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => dropIn(e, props.p)}
@@ -2854,7 +2849,7 @@ export default function App() {
       <div class="list-visibility mt-7 flex flex-col items-start gap-2 border-t border-hover pt-3 [&>button]:-ml-4 [&>button]:min-h-7 [&>button]:text-sm [&>button]:text-muted">
         <Button
           variant="quiet"
-          aria-pressed={!showLater()}
+          aria-pressed={!showLater() ? "true" : "false"}
           onClick={() => setShowLater((value) => !value)}
         >
           {showLater() ? "Hide" : "Show"} later items
@@ -2862,7 +2857,7 @@ export default function App() {
         <Button
           variant="quiet"
           aria-label={`${showLogged() ? "Hide" : "Show"} logged items`}
-          aria-pressed={showLogged()}
+          aria-pressed={showLogged() ? "true" : "false"}
           onClick={() => setShowLogged((value) => !value)}
         >
           {showLogged() ? "Hide" : `Show ${count()}`} logged items
@@ -2931,7 +2926,7 @@ export default function App() {
     const session = editorSaves.retain(item, read);
     currentEditor = session;
     let input!: HTMLInputElement;
-    onMount(() => {
+    onSettled(() => {
       input.focus();
       input.select();
     });
@@ -2959,16 +2954,16 @@ export default function App() {
             : event(item, { tt: snapshot.name.trim() }),
         );
         if (editorSaves.unchanged(session, snapshot)) {
-          batch(() => {
-            if (currentEditor === session) setEditing("");
-            if (selected() === item.id) setSelected("");
-            releaseEditor(session);
-          });
+          if (currentEditor === session) setEditing("");
+          if (selected() === item.id) setSelected("");
+          releaseEditor(session);
         }
         return true;
       });
     };
-    onMount(() => (saveEditor = save));
+    onSettled(() => {
+      saveEditor = save;
+    });
     onCleanup(() => {
       if (currentEditor === session) {
         currentEditor = undefined;
@@ -3180,7 +3175,7 @@ export default function App() {
       setSelected(item.id);
       setEditing(item.id);
     }
-    onMount(() => input.focus());
+    onSettled(() => input.focus());
     return (
       <Dialog title="Quick Find" compact close={() => setFindOpen(false)}>
         <div
@@ -3247,8 +3242,8 @@ export default function App() {
                   role="option"
                   aria-label={entry.label}
                   id={`find-result-${i()}`}
-                  aria-selected={findIndex() === i()}
-                  classList={{ "find-active": findIndex() === i() }}
+                  aria-selected={findIndex() === i() ? "true" : "false"}
+                  class={{ "find-active": findIndex() === i() }}
                   onPointerMove={() => setFindIndex(i())}
                   onClick={() => choose(i())}
                 >
@@ -3476,7 +3471,7 @@ export default function App() {
     );
     const checks = () => checkRows;
     const setChecks = (fn: (rows: CheckRow[]) => CheckRow[]) =>
-      setCheckRows(reconcile(fn([...checkRows]), { key: "id" }));
+      setCheckRows((draft) => reconcile(fn([...checkRows]), "id")(draft));
     const [status, setStatus] = createSignal<number>(
       restored?.status ?? item.props.ss ?? 0,
     );
@@ -3540,7 +3535,7 @@ export default function App() {
         [next[index], next[target]] = [next[target], next[index]];
         return next;
       });
-    onMount(() =>
+    onSettled(() => {
       setEditorActions({
         move: () =>
           editor
@@ -3551,8 +3546,8 @@ export default function App() {
             .querySelector<HTMLButtonElement>(".editor-more > button")
             ?.click(),
         action: handleAction,
-      }),
-    );
+      });
+    });
     onCleanup(() => {
       if (currentEditor === session) setEditorActions(null);
     });
@@ -3581,7 +3576,7 @@ export default function App() {
       });
       focusCheck(next.id);
     }
-    onMount(() =>
+    onSettled(() =>
       queueMicrotask(() =>
         editor
           .querySelector<HTMLInputElement>('[aria-label="To-do title"]')
@@ -3818,10 +3813,8 @@ export default function App() {
         }
         if (editorSaves.unchanged(session, snapshot)) {
           const close = currentEditor === session;
-          batch(() => {
-            if (close) setEditing("");
-            releaseEditor(session);
-          });
+          if (close) setEditing("");
+          releaseEditor(session);
           if (snapshot.convert && close) navigate(item.id);
         }
         scheduleSync();
@@ -3833,7 +3826,9 @@ export default function App() {
       });
       return result;
     }
-    onMount(() => (saveEditor = (handoff) => save(false, handoff)));
+    onSettled(() => {
+      saveEditor = (handoff) => save(false, handoff);
+    });
     onCleanup(() => {
       if (currentEditor === session) {
         currentEditor = undefined;
@@ -3974,7 +3969,7 @@ export default function App() {
                 <CheckButton
                   role="checkbox"
                   aria-label={`Complete checklist ${c.title}`}
-                  aria-checked={c.done}
+                  aria-checked={c.done ? "true" : "false"}
                   checked={c.done}
                   onClick={() =>
                     setChecks((v) =>

@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { Check, ListChecks, Search, X } from "lucide-solid";
+import { Check, ListChecks, Search, X } from "@lucide/solid";
 import { Input, Button } from "./ui";
 import { EntityIcon, ListIcon } from "./TaskIndicators";
 import {
@@ -135,23 +135,28 @@ export default function DestinationPicker(props: {
               variant="bare"
               role="option"
               aria-label={entry.label}
-              aria-selected={selected(entry.id)}
+              aria-selected={selected(entry.id) ? "true" : "false"}
               id={`destination-${i()}`}
-              class="min-h-7 w-full justify-start gap-2 rounded-md px-2 py-1 text-left text-xs text-ink"
-              classList={{
-                "bg-selection": index() === i(),
-                "mt-2 border-t border-hover pt-2":
-                  entry.id !== "inbox" && i() === 2,
-              }}
+
+              class={[
+                "min-h-7 w-full justify-start gap-2 rounded-md px-2 py-1 text-left text-xs text-ink",
+                {
+                  "bg-selection": index() === i(),
+                  "mt-2 border-t border-hover pt-2":
+                    entry.id !== "inbox" && i() === 2,
+                },
+              ]}
               onPointerMove={() => setIndex(i())}
               onClick={() => props.choose(entry.item, entry.id === "inbox")}
             >
               <span
-                class="flex min-w-0 flex-1 items-center gap-2"
-                classList={{
-                  "pl-3": entry.depth === 1,
-                  "pl-6": entry.depth > 1,
-                }}
+                class={[
+                  "flex min-w-0 flex-1 items-center gap-2",
+                  {
+                    "pl-3": entry.depth === 1,
+                    "pl-6": entry.depth > 1,
+                  },
+                ]}
               >
                 <Show
                   when={entry.item}

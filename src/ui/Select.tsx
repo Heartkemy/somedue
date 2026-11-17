@@ -1,12 +1,13 @@
+import { createUniqueId } from "solid-js";
+import { type JSX } from "@solidjs/web";
 import {
+  flush,
   createSignal,
-  createUniqueId,
   createEffect,
-  onMount,
+  onSettled,
   onCleanup,
   For,
   Show,
-  type JSX,
 } from "solid-js";
 /** App-rendered single-select. The hidden select preserves form values and existing handlers;
  * the top-layer popover escapes scrolling panels and native dialog clipping. */
@@ -38,11 +39,11 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
     native.value = value;
     setLabel(items.find((o) => o.value === value)?.label || "Choose…");
   };
-  createEffect(() => {
-    void props.value;
-    queueMicrotask(refresh);
-  });
-  onMount(() => {
+  createEffect(
+    () => props.value,
+    () => queueMicrotask(refresh),
+  );
+  onSettled(() => {
     refresh();
     const observer = new MutationObserver(refresh);
     observer.observe(native, {
@@ -51,7 +52,7 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
       characterData: true,
       attributes: true,
     });
-    onCleanup(() => observer.disconnect());
+    return () => observer.disconnect();
   });
   const close = (focus = true) => {
     popup.hidePopover();
@@ -86,7 +87,7 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
     });
   const open = () => {
     if (props.disabled) return;
-    refresh();
+    flush(refresh);
     setActive(
       Math.max(
         0,
@@ -159,27 +160,27 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
       }
     }
   };
-  onMount(() => {
+  onSettled(() => {
     const reposition = () => {
       if (opened()) position();
     };
     window.addEventListener("resize", reposition);
     window.addEventListener("scroll", reposition, true);
-    onCleanup(() => {
+    return () => {
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
-    });
+    };
   });
   return (
     <div class="select-control min-w-0 w-full">
-      <select {...props} ref={native} hidden aria-hidden="true" tabIndex={-1} />
+      <select {...props} ref={native} hidden aria-hidden="true" tabindex={-1} />
       <button
         ref={trigger}
         type="button"
         class="select-trigger flex min-h-10 w-full cursor-pointer items-center justify-between gap-2.5 rounded-full border-0 bg-field px-3 py-2 text-left text-sm leading-6 tracking-tight transition-colors hover:not-disabled:bg-ink/6 disabled:cursor-default disabled:opacity-45 [&>span]:min-w-0 [&>span]:truncate [&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:fill-none [&>svg]:stroke-muted [&>svg]:stroke-1 [&>svg]:transition-transform aria-expanded:[&>svg]:rotate-180"
         role="combobox"
         aria-label={props["aria-label"]}
-        aria-expanded={opened()}
+        aria-expanded={opened() ? "true" : "false"}
         aria-controls={id}
         aria-haspopup="listbox"
         disabled={props.disabled}
@@ -197,7 +198,7 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
         popover="auto"
         class="select-popup fixed inset-auto m-0 overflow-auto overscroll-contain rounded-2xl border-0 bg-surface py-4.5 font-sans text-sm leading-6 text-ink shadow-xl ring-1 ring-ink/15 outline-none [scrollbar-width:thin] backdrop:bg-transparent"
         role="listbox"
-        tabIndex={-1}
+        tabindex={-1}
         aria-label={props["aria-label"] || "Options"}
         aria-activedescendant={`${id}-${active()}`}
         onKeyDown={key}
@@ -218,13 +219,18 @@ export function Select(props: JSX.SelectHTMLAttributes<HTMLSelectElement>) {
                 role="option"
                 aria-selected={
                   option.value === String(props.value ?? native?.value)
+                    ? "true"
+                    : "false"
                 }
-                aria-disabled={option.disabled}
-                class="relative block min-h-9 cursor-pointer rounded-none bg-transparent px-3 py-2.5 wrap-anywhere aria-selected:bg-ink/4 aria-disabled:cursor-default aria-disabled:text-quiet aria-disabled:opacity-55 hover:not-aria-disabled:bg-ink/9 [&.active-option]:before:absolute [&.active-option]:before:top-1/2 [&.active-option]:before:left-0 [&.active-option]:before:h-1/2 [&.active-option]:before:w-0.5 [&.active-option]:before:-translate-y-1/2 [&.active-option]:before:rounded-r-sm [&.active-option]:before:bg-highlight [&.active-option]:before:content-['']"
-                classList={{
-                  "active-option": active() === i(),
-                  "disabled-option": option.disabled,
-                }}
+                aria-disabled={option.disabled ? "true" : "false"}
+
+                class={[
+                  "relative block min-h-9 cursor-pointer rounded-none bg-transparent px-3 py-2.5 wrap-anywhere aria-selected:bg-ink/4 aria-disabled:cursor-default aria-disabled:text-quiet aria-disabled:opacity-55 hover:not-aria-disabled:bg-ink/9 [&.active-option]:before:absolute [&.active-option]:before:top-1/2 [&.active-option]:before:left-0 [&.active-option]:before:h-1/2 [&.active-option]:before:w-0.5 [&.active-option]:before:-translate-y-1/2 [&.active-option]:before:rounded-r-sm [&.active-option]:before:bg-highlight [&.active-option]:before:content-['']",
+                  {
+                    "active-option": active() === i(),
+                    "disabled-option": option.disabled,
+                  },
+                ]}
                 onPointerMove={() => !option.disabled && setActive(i())}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(i())}

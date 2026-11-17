@@ -1,11 +1,11 @@
 import { Input, Textarea, Kbd } from "./ui";
-import { createSignal, onMount, onCleanup, Show } from "solid-js";
+import { createSignal, onSettled, onCleanup, Show } from "solid-js";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { call, native } from "./api";
 import { create, schedule } from "./model";
 import { Select, Button, IconButton, Field } from "./ui";
-import { Plus, X } from "lucide-solid";
+import { Plus, X } from "@lucide/solid";
 export default function QuickEntry() {
   const [title, setTitle] = createSignal(""),
     [notes, setNotes] = createSignal(""),
@@ -14,7 +14,7 @@ export default function QuickEntry() {
     [saving, setSaving] = createSignal(false),
     [theme, setTheme] = createSignal("dark");
   let input!: HTMLInputElement;
-  onMount(() => {
+  onSettled(() => {
     input.focus();
     const focus = () => {
       input.focus();
@@ -24,7 +24,6 @@ export default function QuickEntry() {
           .catch((e) => setError(String(e)));
     };
     window.addEventListener("focus", focus);
-    onCleanup(() => window.removeEventListener("focus", focus));
     if (native())
       void call("load")
         .then((s) => {
@@ -32,6 +31,7 @@ export default function QuickEntry() {
           setDestination(s.preferences.defaultList || "Inbox");
         })
         .catch((e) => setError(String(e)));
+    return () => window.removeEventListener("focus", focus);
   });
   async function close() {
     if (native()) await getCurrentWindow().hide();

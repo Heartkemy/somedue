@@ -1,12 +1,14 @@
-import { splitProps, type JSX } from "solid-js";
-import { twMerge } from "tailwind-merge";
+import { type JSX } from "@solidjs/web";
+import { omit } from "solid-js";
+import { classes } from "./classes";
 
 export function ActionBar(props: JSX.HTMLAttributes<HTMLDivElement>) {
-  const [local, rest] = splitProps(props, ["class"]);
+  const local = props,
+    rest = omit(props, "class");
   return (
     <div
       {...rest}
-      class={twMerge(
+      class={classes(
         "grid w-72 grid-cols-4 items-center justify-items-center gap-1 [&>*]:flex [&>*]:w-16 [&>*]:justify-center [&>button]:h-7 [&>button]:min-h-7 [&>button]:rounded-full [&_.popover-control>button]:w-16 [&_.popover-control>button]:rounded-full",
         local.class,
       )}

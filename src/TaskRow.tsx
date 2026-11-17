@@ -1,5 +1,6 @@
-import { Show, type JSX } from "solid-js";
-import { MoreHorizontal } from "lucide-solid";
+import { type JSX } from "@solidjs/web";
+import { Show } from "solid-js";
+import { MoreHorizontal } from "@lucide/solid";
 import { Button, CheckButton, IconButton } from "./ui";
 import {
   container,
@@ -49,18 +50,21 @@ export default function TaskRow(props: {
       aria-setsize={props.total}
       aria-current={props.selected ? "true" : undefined}
       tabindex="0"
-      class="task-row group/task relative -mx-3 grid min-h-10 grid-cols-[--spacing(4)_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-1.5 outline-none transition-colors hover:bg-hover compact:min-h-9 [&.selected]:bg-mint/10 [&.selected:has(+.selected)]:rounded-b-none [&.selected+.selected]:rounded-t-none [&.logged]:grid-cols-[--spacing(4)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-6 [&.heading]:mb-2 [&.heading]:flex [&.heading]:py-2 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-3 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5"
-      classList={{
-        selected: props.selected,
-        "rounded-t-none": props.selected && props.joinBefore,
-        "rounded-b-none": props.selected && props.joinAfter,
-        completed: props.item.props.ss === 3,
-        cancelled: props.item.props.ss === 2,
-        logged: !!props.item.props.ss,
-        later: later(props.item) && !props.item.props.ss,
-        "project-row": isProject(props.item),
-        heading: isHeading(props.item),
-      }}
+
+      class={[
+        "task-row group/task relative -mx-3 grid min-h-10 grid-cols-[--spacing(4)_minmax(0,1fr)] items-center gap-3 rounded-lg px-3 py-1.5 outline-none transition-colors hover:bg-hover compact:min-h-9 [&.selected]:bg-mint/10 [&.selected:has(+.selected)]:rounded-b-none [&.selected+.selected]:rounded-t-none [&.logged]:grid-cols-[--spacing(4)_--spacing(13)_minmax(0,1fr)] [&.heading]:mt-6 [&.heading]:mb-2 [&.heading]:flex [&.heading]:py-2 data-[drop-edge]:after:pointer-events-none data-[drop-edge]:after:absolute data-[drop-edge]:after:inset-x-3 data-[drop-edge]:after:h-0.5 data-[drop-edge]:after:bg-mint data-[drop-edge]:after:content-[''] data-[drop-edge=before]:after:-top-0.5 data-[drop-edge=after]:after:-bottom-0.5",
+        {
+          selected: props.selected,
+          "rounded-t-none": props.selected && props.joinBefore,
+          "rounded-b-none": props.selected && props.joinAfter,
+          completed: props.item.props.ss === 3,
+          cancelled: props.item.props.ss === 2,
+          logged: !!props.item.props.ss,
+          later: later(props.item) && !props.item.props.ss,
+          "project-row": isProject(props.item),
+          heading: isHeading(props.item),
+        },
+      ]}
       data-drop-edge={props.dropEdge}
       draggable="true"
       onPointerDown={(e) => {

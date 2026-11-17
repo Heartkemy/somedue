@@ -8,7 +8,7 @@ import {
   Bell,
   CalendarX,
   X,
-} from "lucide-solid";
+} from "@lucide/solid";
 import { Button, IconButton } from "./ui";
 import { Popover } from "./Popover";
 import { date, today } from "./model";
@@ -17,9 +17,12 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
   const [month, setMonth] = createSignal(
     new Date(`${props.value || date(today())}T00:00:00Z`),
   );
-  createEffect(() => {
-    if (props.value) setMonth(new Date(`${props.value}T00:00:00Z`));
-  });
+  createEffect(
+    () => props.value,
+    (value) => {
+      if (value) setMonth(new Date(`${value}T00:00:00Z`));
+    },
+  );
   const monthLabel = () =>
     month().toLocaleDateString(undefined, {
       month: "long",
@@ -77,7 +80,7 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
           {(d) => (
             <Button
               variant="bare"
-              class="calendar-day min-h-7 min-w-0 w-full rounded-full p-0 text-xs [&.outside:not(.chosen)]:text-quiet [&.today:not(.chosen)]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1"
+
               data-date={iso(d)}
               aria-label={d.toLocaleDateString("en", {
                 weekday: "long",
@@ -86,12 +89,15 @@ function Calendar(props: { value: string; choose: (value: string) => void }) {
                 day: "numeric",
                 timeZone: "UTC",
               })}
-              aria-pressed={props.value === iso(d)}
-              classList={{
-                outside: d.getUTCMonth() !== month().getUTCMonth(),
-                today: iso(d) === date(today()),
-                chosen: props.value === iso(d),
-              }}
+              aria-pressed={props.value === iso(d) ? "true" : "false"}
+              class={[
+                "calendar-day min-h-7 min-w-0 w-full rounded-full p-0 text-xs [&.outside:not(.chosen)]:text-quiet [&.today:not(.chosen)]:text-accent [&.chosen]:bg-ink [&.chosen]:text-bg focus-visible:relative focus-visible:z-1",
+                {
+                  outside: d.getUTCMonth() !== month().getUTCMonth(),
+                  today: iso(d) === date(today()),
+                  chosen: props.value === iso(d),
+                },
+              ]}
               onClick={() => props.choose(iso(d))}
               onKeyDown={(e) => {
                 const delta: Record<string, number> = {
@@ -206,12 +212,14 @@ export default function DatePicker(props: {
       (!props.mode || ["Inbox", "Anytime"].includes(props.mode)));
   return (
     <div
-      class="schedule-chip flex min-w-0 items-center rounded-md transition-colors"
-      classList={{
-        "bg-hover hover:bg-ink/10": hasSurface(),
-        // Filled controls align their surface; a bare icon aligns its glyph.
-        "-ml-1.5": props.align === "content" && !!iconOnly(),
-      }}
+      class={[
+        "schedule-chip flex min-w-0 items-center rounded-md transition-colors",
+        {
+          "bg-hover hover:bg-ink/10": hasSurface(),
+          // Filled controls align their surface; a bare icon aligns its glyph.
+          "-ml-1.5": props.align === "content" && !!iconOnly(),
+        },
+      ]}
     >
       <Popover
         width={400}
@@ -302,7 +310,7 @@ export default function DatePicker(props: {
                       {(mode) => (
                         <Button
                           size="small"
-                          aria-pressed={props.mode === mode}
+                          aria-pressed={props.mode === mode ? "true" : "false"}
                           onClick={() => {
                             props.change("", mode);
                             close();
@@ -319,7 +327,7 @@ export default function DatePicker(props: {
                   <Button
                     size="small"
                     class="reminder-toggle justify-start text-muted"
-                    aria-expanded={reminderOpen()}
+                    aria-expanded={reminderOpen() ? "true" : "false"}
                     onClick={() => setReminderOpen((open) => !open)}
                   >
                     <Bell size={14} />

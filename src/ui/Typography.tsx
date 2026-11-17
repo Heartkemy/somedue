@@ -1,12 +1,14 @@
-import { splitProps, type JSX } from "solid-js";
-import { twMerge } from "tailwind-merge";
+import { type JSX } from "@solidjs/web";
+import { omit } from "solid-js";
+import { classes } from "./classes";
 
 export function Kbd(props: JSX.HTMLAttributes<HTMLElement>) {
-  const [local, rest] = splitProps(props, ["class"]);
+  const local = props,
+    rest = omit(props, "class");
   return (
     <kbd
       {...rest}
-      class={twMerge(
+      class={classes(
         "whitespace-nowrap font-mono text-xs text-quiet",
         local.class,
       )}
@@ -15,11 +17,12 @@ export function Kbd(props: JSX.HTMLAttributes<HTMLElement>) {
 }
 
 export function SectionHeading(props: JSX.HTMLAttributes<HTMLHeadingElement>) {
-  const [local, rest] = splitProps(props, ["class"]);
+  const local = props,
+    rest = omit(props, "class");
   return (
     <h3
       {...rest}
-      class={twMerge("mb-3 font-serif text-3xl font-medium", local.class)}
+      class={classes("mb-3 font-serif text-3xl font-medium", local.class)}
     />
   );
 }
@@ -29,11 +32,12 @@ export function ListHeading(
     level?: "area" | "project" | "section";
   },
 ) {
-  const [local, rest] = splitProps(props, ["class", "level"]);
+  const local = props,
+    rest = omit(props, "class", "level");
   return (
     <h2
       {...rest}
-      class={twMerge(
+      class={classes(
         "mt-7 mb-2 flex items-center gap-3 border-b border-hover pb-2 text-left text-lg leading-tight font-semibold text-ink first:mt-0",
         local.level === "area" && "text-2xl",
         local.level === "project" && "text-xl",

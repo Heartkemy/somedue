@@ -1,4 +1,6 @@
-import { createUniqueId, onMount, type JSX } from "solid-js";
+import { createUniqueId } from "solid-js";
+import { type JSX } from "@solidjs/web";
+import { onSettled } from "solid-js";
 export function Field(props: {
   label: string;
   children: JSX.Element;
@@ -6,7 +8,7 @@ export function Field(props: {
 }) {
   const id = createUniqueId();
   let field!: HTMLDivElement;
-  onMount(() => {
+  onSettled(() => {
     field
       .querySelectorAll("input,textarea,button[role=combobox]")
       .forEach((el) => {

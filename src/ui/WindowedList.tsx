@@ -1,14 +1,14 @@
+import { type JSX } from "@solidjs/web";
 import {
+  flush,
   createEffect,
   createMemo,
   createSignal,
   For,
-  on,
   onCleanup,
-  onMount,
+  onSettled,
   untrack,
   type Accessor,
-  type JSX,
 } from "solid-js";
 
 // Variable row heights keep headings, wrapped metadata and live editors in one list.
@@ -102,7 +102,7 @@ export function WindowedList<T extends { id: string }>(props: {
           const atBottom =
             scroller.scrollTop + scroller.clientHeight >=
             scroller.scrollHeight - 1;
-          setMeasured((n) => n + 1);
+          flush(() => setMeasured((n) => n + 1));
           if (windowed()) {
             // Preserve the scroll anchor as estimates become measured heights.
             if (atBottom) scroller.scrollTop = scroller.scrollHeight;
@@ -112,57 +112,56 @@ export function WindowedList<T extends { id: string }>(props: {
         updateViewport();
       });
   });
-  onMount(() => {
+  onSettled(() => {
     const scroller = props.scroller!;
     scroller.addEventListener("scroll", updateViewport, { passive: true });
     observer.observe(scroller);
     updateViewport();
-    onCleanup(() => scroller.removeEventListener("scroll", updateViewport));
+    return () => scroller.removeEventListener("scroll", updateViewport);
   });
   onCleanup(() => {
     observer.disconnect();
     cancelAnimationFrame(measurementFrame);
   });
   createEffect(
-    on(
-      () => props.reset,
-      () => {
-        heights.clear();
-        setMeasured((n) => n + 1);
-        if (props.scroller) props.scroller.scrollTop = 0;
-        updateViewport();
-      },
-    ),
+    () => props.reset,
+    () => {
+      heights.clear();
+      setMeasured((n) => n + 1);
+      if (props.scroller) props.scroller.scrollTop = 0;
+      updateViewport();
+    },
   );
   createEffect(
-    on(
-      () => props.activeId,
-      (id) =>
-        untrack(() => {
-          if (!windowed() || !props.scroller || !root) return;
-          const index = positions().get(id);
-          if (index === undefined) return;
-          const top = rootTop() + offsets()[index];
-          const bottom = rootTop() + offsets()[index + 1];
-          if (top < props.scroller.scrollTop) props.scroller.scrollTop = top;
-          else if (
-            bottom >
-            props.scroller.scrollTop + props.scroller.clientHeight
-          )
-            props.scroller.scrollTop = bottom - props.scroller.clientHeight;
-          updateViewport();
-        }),
-    ),
+    () => props.activeId,
+    (id) =>
+      untrack(() => {
+        if (!windowed() || !props.scroller || !root) return;
+        const index = positions().get(id);
+        if (index === undefined) return;
+        const top = rootTop() + offsets()[index];
+        const bottom = rootTop() + offsets()[index + 1];
+        if (top < props.scroller.scrollTop) props.scroller.scrollTop = top;
+        else if (
+          bottom >
+          props.scroller.scrollTop + props.scroller.clientHeight
+        )
+          props.scroller.scrollTop = bottom - props.scroller.clientHeight;
+        updateViewport();
+      }),
   );
-  createEffect(() => {
-    const live = new Set(ids());
+  createEffect(ids, (values) => {
+    const live = new Set(values);
     for (const id of heights.keys()) if (!live.has(id)) heights.delete(id);
   });
   return (
     <div
       ref={root}
-      class="[overflow-anchor:none]"
-      classList={{ relative: windowed(), contents: !windowed() }}
+
+      class={[
+        "[overflow-anchor:none]",
+        { relative: windowed(), contents: !windowed() },
+      ]}
       // Runtime measurements cannot be expressed with theme spacing utilities.
       style={{ height: windowed() ? `${offsets().at(-1)}px` : undefined }}
     >
@@ -172,18 +171,21 @@ export function WindowedList<T extends { id: string }>(props: {
           const entry = createMemo<T>(
             (previous) => entries().get(id) || previous!,
           );
-          onMount(() => observer.observe(element));
+          onSettled(() => observer.observe(element));
           onCleanup(() => observer.unobserve(element));
           return (
             <div
               ref={element}
               data-window-id={id}
               data-first={positions().get(id) === 0}
-              class="[&>h2:first-child]:mt-7 data-[first=true]:[&>h2:first-child]:mt-0"
-              classList={{
-                "absolute inset-x-0 flow-root": windowed(),
-                contents: !windowed(),
-              }}
+
+              class={[
+                "[&>h2:first-child]:mt-7 data-[first=true]:[&>h2:first-child]:mt-0",
+                {
+                  "absolute inset-x-0 flow-root": windowed(),
+                  contents: !windowed(),
+                },
+              ]}
               style={{
                 top: windowed()
                   ? `${offsets()[positions().get(id)!]}px`

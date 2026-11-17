@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { RotateCw } from "lucide-solid";
+import { RotateCw } from "@lucide/solid";
 import { Button, Checkbox, Dialog, Input, Select } from "./ui";
 import { date, today, type Props } from "./model";
 import {

@@ -1,4 +1,5 @@
-import { onMount, onCleanup, useContext, Show, type JSX } from "solid-js";
+import { type JSX } from "@solidjs/web";
+import { onSettled, onCleanup, useContext, Show } from "solid-js";
 import { FeedbackContext } from "./Feedback";
 import { IconButton } from "./Button";
 export function Dialog(props: {
@@ -11,7 +12,7 @@ export function Dialog(props: {
   const feedback = useContext(FeedbackContext);
   let el!: HTMLDialogElement;
   let previous: Element | null = null;
-  onMount(() => {
+  onSettled(() => {
     previous = document.activeElement;
     el.showModal();
   });
@@ -27,14 +28,17 @@ export function Dialog(props: {
   return (
     <dialog
       ref={el}
-      class="m-auto flex max-h-[calc(100dvh_-_--spacing(16))] max-w-[calc(100vw_-_--spacing(10))] flex-col overflow-hidden rounded-2xl border-0 bg-surface p-6 text-ink shadow-2xl backdrop:bg-black/65 backdrop:backdrop-blur-xs"
-      classList={{
-        wide: props.wide,
-        "w-190": props.wide,
-        "w-110": !props.wide,
-        "p-3": props.compact,
-        "w-80": props.compact,
-      }}
+
+      class={[
+        "m-auto flex max-h-[calc(100dvh_-_--spacing(16))] max-w-[calc(100vw_-_--spacing(10))] flex-col overflow-hidden rounded-2xl border-0 bg-surface p-6 text-ink shadow-2xl backdrop:bg-black/65 backdrop:backdrop-blur-xs",
+        {
+          wide: props.wide,
+          "w-190": props.wide,
+          "w-110": !props.wide,
+          "p-3": props.compact,
+          "w-80": props.compact,
+        },
+      ]}
       aria-label={props.title}
       onCancel={(e) => {
         e.preventDefault();

@@ -1,7 +1,7 @@
 import { Input } from "./ui";
-import { createSignal, onMount, onCleanup, Show } from "solid-js";
+import { createSignal, onSettled, onCleanup, Show } from "solid-js";
 import { Channel } from "@tauri-apps/api/core";
-import { Cloud, RefreshCw, X, ShieldCheck, Check } from "lucide-solid";
+import { Cloud, RefreshCw, X, ShieldCheck, Check } from "@lucide/solid";
 import { Button, Field, IconButton } from "./ui";
 import { call } from "./api";
 import type { State } from "./model";
@@ -27,7 +27,7 @@ export default function CloudConnection(props: {
   let heading!: HTMLHeadingElement;
   let dialog!: HTMLDialogElement;
   let previous: Element | null = null;
-  onMount(() => {
+  onSettled(() => {
     previous = document.activeElement;
     dialog.showModal();
     input?.focus({ preventScroll: true });
@@ -100,7 +100,7 @@ export default function CloudConnection(props: {
               <RefreshCw size={28} class="spin animate-spin" />
             </Show>
           </div>
-          <h1 ref={heading} tabIndex={-1}>
+          <h1 ref={heading} tabindex={-1}>
             {busy() ? "Syncing your Things" : "Connect Things Cloud"}
           </h1>
           <Show
@@ -169,12 +169,12 @@ export default function CloudConnection(props: {
               <span />
             </div>
             <ol class="sync-steps mx-auto w-fit list-none p-0 text-left text-sm text-quiet [&>li]:my-4 [&>li]:flex [&>li]:items-center [&>li]:gap-2.5 [&>.done]:text-mint [&>.current]:text-ink">
-              <li classList={{ done: progress().stage !== "verifying" }}>
+              <li class={{ done: progress().stage !== "verifying" }}>
                 <Check size={15} />
                 Verify account
               </li>
               <li
-                classList={{
+                class={{
                   current: ["downloading", "processing"].includes(
                     progress().stage,
                   ),
@@ -183,7 +183,7 @@ export default function CloudConnection(props: {
                 <Cloud size={15} />
                 Download and organize history
               </li>
-              <li classList={{ current: progress().stage === "saving" }}>
+              <li class={{ current: progress().stage === "saving" }}>
                 <ShieldCheck size={15} />
                 Save securely on this Mac
               </li>

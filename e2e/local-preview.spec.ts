@@ -29,7 +29,7 @@ test("local-only previews explain Cloud availability without offering credential
   await page.getByRole("button", { name: "About", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "Settings", exact: true }),
-  ).toContainText("Alpha 1");
+  ).toContainText("Alpha 2");
   await expect(
     page.getByRole("region", { name: "Settings", exact: true }),
   ).toContainText("Local-only download");

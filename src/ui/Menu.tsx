@@ -1,21 +1,17 @@
-import {
-  createSignal,
-  onCleanup,
-  onMount,
-  splitProps,
-  type JSX,
-} from "solid-js";
-import { twMerge } from "tailwind-merge";
+import { type JSX } from "@solidjs/web";
+import { createSignal, onCleanup, onSettled, omit } from "solid-js";
+import { classes } from "./classes";
 import { Button, type ButtonProps } from "./Button";
-import { ChevronRight } from "lucide-solid";
+import { ChevronRight } from "@lucide/solid";
 export function Menu(
   props: JSX.HTMLAttributes<HTMLDivElement> & { close?: () => void },
 ) {
-  const [local, rest] = splitProps(props, ["class", "close"]);
+  const local = props,
+    rest = omit(props, "class", "close");
   return (
     <div
       {...rest}
-      class={twMerge("ui-menu flex flex-col gap-1", local.class)}
+      class={classes("ui-menu flex flex-col gap-1", local.class)}
       role="menu"
       onKeyDown={(event) => {
         event.stopPropagation();
@@ -48,14 +44,15 @@ export function Menu(
   );
 }
 export function MenuItem(props: Omit<ButtonProps, "size" | "variant">) {
-  const [local, rest] = splitProps(props, ["class"]);
+  const local = props,
+    rest = omit(props, "class");
   return (
     <Button
       {...rest}
       size="small"
       variant="bare"
       role="menuitem"
-      class={twMerge(
+      class={classes(
         "ui-menu-item w-full min-h-9 justify-start gap-2.5 rounded-lg bg-transparent px-3 py-1 text-sm font-normal leading-6 hover:bg-ink/9 focus-visible:bg-ink/9 focus-visible:ring-0 focus-visible:ring-offset-0 [&_kbd]:ml-auto",
         local.class,
       )}
@@ -76,7 +73,7 @@ export function MenuPopup(props: {
   children: JSX.Element;
 }) {
   let panel!: HTMLDivElement;
-  onMount(() => {
+  onSettled(() => {
     panel.showPopover();
     // Context menus follow the pointer and must stay inside the measured viewport.
     panel.style.left = `${Math.max(12, Math.min(props.point.x, innerWidth - panel.offsetWidth - 12))}px`;
@@ -89,7 +86,7 @@ export function MenuPopup(props: {
         props.close();
     };
     document.addEventListener("pointerdown", dismiss);
-    onCleanup(() => document.removeEventListener("pointerdown", dismiss));
+    return () => document.removeEventListener("pointerdown", dismiss);
   });
   onCleanup(() => panel.hidePopover());
   return (
@@ -135,7 +132,7 @@ export function MenuSubmenu(props: {
       <MenuItem
         ref={trigger}
         aria-haspopup="menu"
-        aria-expanded={opened()}
+        aria-expanded={opened() ? "true" : "false"}
         onClick={() => (opened() ? close() : open())}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") {

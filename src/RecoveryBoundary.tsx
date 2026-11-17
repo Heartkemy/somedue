@@ -1,27 +1,21 @@
-import {
-  ErrorBoundary,
-  Show,
-  createSignal,
-  onCleanup,
-  onMount,
-  type JSX,
-} from "solid-js";
-import { AlertTriangle, RefreshCw } from "lucide-solid";
+import { type JSX } from "@solidjs/web";
+import { Errored, Show, createSignal, onCleanup, onSettled } from "solid-js";
+import { AlertTriangle, RefreshCw } from "@lucide/solid";
 import { Button } from "./ui/Button";
 
 export default function RecoveryBoundary(props: { children: JSX.Element }) {
   const [asyncError, setAsyncError] = createSignal(false);
-  onMount(() => {
+  onSettled(() => {
     const failed = () => setAsyncError(true);
     window.addEventListener("error", failed);
     window.addEventListener("unhandledrejection", failed);
-    onCleanup(() => {
+    return () => {
       window.removeEventListener("error", failed);
       window.removeEventListener("unhandledrejection", failed);
-    });
+    };
   });
   return (
-    <ErrorBoundary
+    <Errored
       fallback={(_, reset) => (
         <main
           class="grid h-dvh place-content-center gap-5 bg-bg px-8 text-ink"
@@ -75,6 +69,6 @@ export default function RecoveryBoundary(props: { children: JSX.Element }) {
           </Button>
         </div>
       </Show>
-    </ErrorBoundary>
+    </Errored>
   );
 }

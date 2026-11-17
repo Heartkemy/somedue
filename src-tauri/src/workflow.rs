@@ -28,7 +28,10 @@ impl Remote for LiveRemote<'_> {
     }
 }
 pub(crate) fn history_fingerprint(history: &str) -> String {
-    format!("{:x}", Sha1::digest(history.as_bytes()))
+    Sha1::digest(history.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// Reconnect cannot silently replay old drafts into a reset or different account history.
@@ -320,6 +323,13 @@ mod tests {
     use serde_json::json;
     use std::collections::VecDeque;
     const HISTORY: &str = "synthetic-history";
+    #[test]
+    fn history_fingerprint_stays_compatible_with_saved_workspaces() {
+        assert_eq!(
+            history_fingerprint("abc"),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
+    }
     struct FakeRemote {
         pulls: VecDeque<Result<Snapshot, String>>,
         outcomes: VecDeque<Result<(), CommitError>>,

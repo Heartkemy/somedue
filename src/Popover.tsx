@@ -1,12 +1,7 @@
-import {
-  createSignal,
-  createUniqueId,
-  Show,
-  onMount,
-  onCleanup,
-  type JSX,
-} from "solid-js";
-import { Dynamic } from "solid-js/web";
+import { createUniqueId } from "solid-js";
+import { type JSX } from "@solidjs/web";
+import { createSignal, Show, onSettled, onCleanup } from "solid-js";
+import { Dynamic } from "@solidjs/web";
 import { Button, IconButton } from "./ui";
 export function Popover(props: {
   label: string;
@@ -47,16 +42,16 @@ export function Popover(props: {
       .querySelector<HTMLElement>("[autofocus],input,button")
       ?.focus({ preventScroll: true });
   };
-  onMount(() => {
+  onSettled(() => {
     const update = () => {
       if (opened()) position();
     };
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
-    onCleanup(() => {
+    return () => {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
-    });
+    };
   });
   return (
     <div class={`popover-control ${props.class || ""}`}>
@@ -69,7 +64,7 @@ export function Popover(props: {
         aria-label={props.label}
         aria-haspopup="dialog"
         aria-controls={id}
-        aria-expanded={opened()}
+        aria-expanded={opened() ? "true" : "false"}
         onClick={() => (opened() ? close() : open())}
       >
         {props.trigger}

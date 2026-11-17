@@ -1,4 +1,4 @@
-import { createSignal, For, Show, onMount } from "solid-js";
+import { createSignal, For, Show, onSettled } from "solid-js";
 import {
   ArrowLeft,
   Archive,
@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Tag,
   X,
-} from "lucide-solid";
+} from "@lucide/solid";
 import {
   Button,
   Checkbox,
@@ -66,7 +66,7 @@ export default function SettingsPage(props: {
     run(() => mutate(event(item, fields)));
   let heading!: HTMLHeadingElement;
   let panel!: HTMLElement;
-  onMount(() => heading.focus({ preventScroll: true }));
+  onSettled(() => heading.focus({ preventScroll: true }));
 
   const [newTag, setNewTag] = createSignal(""),
     [shortcut, setShortcut] = createSignal(pref("quickShortcut", ""));
@@ -149,7 +149,7 @@ export default function SettingsPage(props: {
               <Button
                 variant="bare"
                 aria-label={tab}
-                classList={{ active: settingsTab() === tab }}
+                class={{ active: settingsTab() === tab }}
                 aria-current={settingsTab() === tab ? "page" : undefined}
                 onClick={() => {
                   setSettingsTab(tab);
@@ -469,7 +469,7 @@ export default function SettingsPage(props: {
             <SectionHeading>Somedue</SectionHeading>
             <p>A considered home for what comes next.</p>
             <p class="muted text-muted">
-              Version {version} · Alpha 1
+              Version {version} · Alpha 2
               <br />
               An independent macOS task manager.
               <br />

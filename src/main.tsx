@@ -1,4 +1,4 @@
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import "@fontsource/space-grotesk/400.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/600.css";
