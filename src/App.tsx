@@ -758,7 +758,13 @@ export default function App() {
       applyIncoming(await call("sync"));
       return true;
     });
-    if (native()) await run(async () => setState(await call("load")));
+    if (native()) {
+      try {
+        setState(await call("load"));
+      } catch (e) {
+        setError(String(e));
+      }
+    }
     setBusy(false);
     if (
       synced &&

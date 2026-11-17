@@ -135,6 +135,9 @@ and cloud workspaces stay separate; connecting does not upload your local tasks.
 Passwords and the Cloud history access token are stored in macOS Keychain rather
 than the task database.
 
+For cloud accounts, automatic recurring occurrences are created by the official
+Things app and downloaded by Somedue. Local-only workspaces generate their own.
+
 For a frontend-only preview, run `bun run dev`. Browser previews cannot access
 native task storage or Things Cloud.
 

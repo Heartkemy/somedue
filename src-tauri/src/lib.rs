@@ -32,12 +32,16 @@ fn calendar_day() -> i64 {
         .timestamp()
 }
 fn materialize(a: &mut App) -> Result<(), String> {
+    // Things generates cloud occurrences; creating them from a cached schedule races its copies.
+    if a.account != "local" {
+        return Ok(());
+    }
     let today = calendar_day();
     if recurrence::due_changes(&a.workspace.snapshot.entities, today)
         .as_object()
         .is_some_and(|map| !map.is_empty())
     {
-        let next = workflow::materialize(&a.workspace, today, a.account != "local")?;
+        let next = workflow::materialize(&a.workspace, today, false)?;
         save(a, next)?;
     }
     Ok(())
@@ -423,6 +427,37 @@ mod sync_tests {
     use super::*;
     use crate::cloud::{CommitError, Snapshot};
     use tokio::sync::oneshot;
+
+    #[test]
+    fn cloud_load_does_not_generate_competing_recurring_copies() {
+        let path = std::env::temp_dir().join(format!("somedue-{}.sqlite", cloud::new_id()));
+        let mut workspace = Workspace::default();
+        let id = cloud::new_id();
+        let changes = store::prepare(json!({id.clone():{"e":"Task7","t":0,"p":{
+            "rr":{"rrv":4,"tp":0,"rc":0,"ts":0,"fu":16,"fa":1,"of":[{}],"ed":64092211200i64},
+            "tt":"Synthetic repeat","sr":calendar_day(),"tir":calendar_day()
+        }}}))
+        .unwrap();
+        store::apply(&mut workspace.snapshot.entities, &changes).unwrap();
+        recurrence::copy_changes(&workspace.snapshot.entities, &id, calendar_day()).unwrap();
+        let mut app = App {
+            store: Store::open(&path).unwrap(),
+            account: "synthetic-cloud".into(),
+            workspace,
+            shortcut_error: None,
+        };
+        materialize(&mut app).unwrap();
+        assert!(
+            app.workspace.pending.is_empty(),
+            "Cloud loads must not queue duplicate occurrences"
+        );
+        assert_eq!(app.workspace.snapshot.entities.len(), 1);
+        app.account = "local".into();
+        materialize(&mut app).unwrap();
+        assert_eq!(app.workspace.snapshot.entities.len(), 2);
+        drop(app);
+        std::fs::remove_file(path).unwrap();
+    }
 
     struct PausedRemote {
         snapshot: Snapshot,
