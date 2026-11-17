@@ -46,7 +46,7 @@ jobs:
 
   native:
     name: native
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 15
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
