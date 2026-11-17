@@ -137,6 +137,9 @@ than the task database.
 
 For cloud accounts, automatic recurring occurrences are created by the official
 Things app and downloaded by Somedue. Local-only workspaces generate their own.
+Sync merges saved local edits into the latest cloud state automatically: local
+edits take precedence for the fields you changed, while other cloud fields stay
+intact. Unconfirmed uploads are checked before any retry to avoid duplicate writes.
 
 For a frontend-only preview, run `bun run dev`. Browser previews cannot access
 native task storage or Things Cloud.

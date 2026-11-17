@@ -68,25 +68,42 @@ fn checkpoint(
     *workspace = next;
     Ok(())
 }
-fn postcondition_met(pending: &Pending, remote: &Snapshot) -> bool {
-    let Some(changes) = pending.changes.as_object() else {
-        return false;
-    };
-    !changes.is_empty()
-        && changes.iter().all(|(id, event)| {
-            if event["t"].as_u64() == Some(2) {
-                return !remote.entities.contains_key(id);
+/// Only changed fields express local intent; echoed editor fields must not overwrite Cloud.
+fn pending_changes(pending: &Pending, remote: &Snapshot) -> Value {
+    let mut changes = pending.changes.clone();
+    if let Some(events) = changes.as_object_mut() {
+        events.retain(|id, event| {
+            let current = remote.entities.get(id);
+            match event["t"].as_u64() {
+                Some(2) => current.is_some(),
+                Some(1) => {
+                    let base = pending.base.get(id).and_then(Option::as_ref);
+                    if let Some(props) = event["p"].as_object_mut() {
+                        props.retain(|key, value| {
+                            key == "md"
+                                || (base.is_none_or(|old| old.props.get(key) != Some(value))
+                                    && current
+                                        .is_none_or(|entity| entity.props.get(key) != Some(value)))
+                        });
+                        props.keys().any(|key| key != "md")
+                    } else {
+                        true // Validation reports malformed saved drafts without discarding them.
+                    }
+                }
+                Some(0) => !current.is_some_and(|entity| {
+                    entity.kind == event["e"].as_str().unwrap_or("")
+                        && event["p"].as_object().is_some_and(|props| {
+                            props
+                                .iter()
+                                .filter(|(key, _)| key.as_str() != "md")
+                                .all(|(key, value)| entity.props.get(key) == Some(value))
+                        })
+                }),
+                _ => true,
             }
-            let Some(entity) = remote.entities.get(id) else {
-                return false;
-            };
-            entity.kind == event["e"].as_str().unwrap_or("")
-                && event["p"].as_object().is_some_and(|p| {
-                    p.iter()
-                        .filter(|(k, _)| k.as_str() != "md")
-                        .all(|(k, v)| entity.props.get(k) == Some(v))
-                })
-        })
+        });
+    }
+    changes
 }
 
 /// Network work owns a fixed prefix; edits queued since its last checkpoint stay local.
@@ -170,28 +187,23 @@ pub(crate) async fn sync<R: Remote>(
             .as_ref()
             .ok_or("Missing authoritative state")?
             .clone();
-        if postcondition_met(&pending, &authoritative) {
+        let changes = pending_changes(&pending, &authoritative);
+        if changes.as_object().is_some_and(|events| events.is_empty()) {
             let mut next = workspace.clone();
             next.pending.remove(0);
             checkpoint(workspace, next, &mut persist)?;
             continue;
         }
-        if pending.status != "queued" || store::conflicts(&pending, &authoritative.entities) {
+        if !matches!(pending.status.as_str(), "queued" | "review") {
             let mut next = workspace.clone();
-            next.pending[0].status =
-                if pending.status == "sending" || pending.status == "uncertain" {
-                    "uncertain"
-                } else {
-                    "review"
-                }
-                .into();
+            next.pending[0].status = "uncertain".into();
             checkpoint(workspace, next, &mut persist)?;
-            return Err("A saved edit needs review. Its original draft is preserved and was not sent again. Open Settings → Things Cloud → Sync recovery.".into());
+            return Err("Your changes are saved on this Mac. Somedue is checking whether Things Cloud received the last update and will check again automatically.".into());
         }
         let mut sending = workspace.clone();
         sending.pending[0].status = "sending".into();
         checkpoint(workspace, sending, &mut persist)?;
-        match remote.commit(&authoritative, pending.changes).await {
+        match remote.commit(&authoritative, changes).await {
             Ok(committed) => {
                 if committed.history != history || committed.head < authoritative.head {
                     let mut next = workspace.clone();
@@ -505,30 +517,29 @@ mod tests {
         assert_eq!(workspace.pending[0].status, "queued");
     }
     #[tokio::test]
-    async fn repeated_conflict_review_never_discards_unrelated_remote_fields() {
+    async fn automatic_merge_keeps_local_intent_and_unrelated_cloud_fields() {
         let (w, id) = fixture();
-        let mut workspace = edit(&w, &id, "Draft");
-        let original = workspace.pending[0].base.clone();
-        let mut actual = w.snapshot.clone();
-        actual.entities.get_mut(&id).unwrap().props["tt"] = json!("Remote title");
-        actual.entities.get_mut(&id).unwrap().props["nt"] = store::note("New remote note");
-        actual.head = 7;
-        for _ in 0..2 {
-            let mut remote = FakeRemote::new(vec![actual.clone()], vec![]);
-            assert!(sync(&mut remote, HISTORY, &mut workspace, |_| Ok(()))
+        for status in ["queued", "review"] {
+            let mut workspace = edit(&w, &id, "Draft");
+            workspace.pending[0].status = status.into();
+            // Editors can echo unchanged fields; these are not local edits.
+            workspace.pending[0].changes[&id]["p"]["nt"] =
+                w.snapshot.entities[&id].props["nt"].clone();
+            let mut actual = w.snapshot.clone();
+            actual.entities.get_mut(&id).unwrap().props["tt"] = json!("Remote title");
+            actual.entities.get_mut(&id).unwrap().props["nt"] = store::note("New remote note");
+            actual.head = 7;
+            let mut remote = FakeRemote::new(vec![actual], vec![Ok(())]);
+            sync(&mut remote, HISTORY, &mut workspace, |_| Ok(()))
                 .await
-                .is_err());
-            assert_eq!(remote.commit_calls, 0);
-            assert_eq!(workspace.pending[0].base, original);
-            assert_eq!(
-                workspace.authoritative.as_ref().unwrap().entities[&id].props["nt"],
-                store::note("New remote note")
-            );
+                .unwrap();
+            assert_eq!(remote.commit_calls, 1);
+            assert!(workspace.pending.is_empty());
+            assert_eq!(workspace.snapshot.entities[&id].props["tt"], "Draft");
             assert_eq!(
                 workspace.snapshot.entities[&id].props["nt"],
                 store::note("New remote note")
             );
-            assert_eq!(workspace.snapshot.entities[&id].props["tt"], "Draft");
         }
     }
     #[tokio::test]

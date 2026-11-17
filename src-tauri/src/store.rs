@@ -177,33 +177,6 @@ pub fn validate(entities: &BTreeMap<String, Entity>, changes: &Value) -> Result<
     crate::cloud::validate_write(&snapshot, changes).map(|_| ())
 }
 
-pub fn conflicts(p: &Pending, remote: &BTreeMap<String, Entity>) -> bool {
-    let Some(changes) = p.changes.as_object() else {
-        return true;
-    };
-    changes.iter().any(|(id, event)| {
-        let current = remote.get(id);
-        let base = p.base.get(id).and_then(|v| v.as_ref());
-        match event["t"].as_u64() {
-            Some(0) => current.is_some(),
-            Some(2) => current != base,
-            Some(1) => {
-                let (Some(current), Some(base), Some(props)) =
-                    (current, base, event["p"].as_object())
-                else {
-                    return true;
-                };
-                current.kind != base.kind
-                    || props
-                        .keys()
-                        .filter(|k| k.as_str() != "md")
-                        .any(|k| current.props.get(k) != base.props.get(k))
-            }
-            _ => true,
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,29 +285,6 @@ mod tests {
             json!({"tt":"Rejected","agr":[heading]}),
         );
         assert!(validate(&entities, &changes).is_err());
-    }
-    #[test]
-    fn unrelated_remote_note_and_modification_date_do_not_conflict_with_title_draft() {
-        let task = id();
-        let mut original = BTreeMap::new();
-        apply(
-            &mut original,
-            &create(&task, "Task6", json!({"tt":"Before"})),
-        )
-        .unwrap();
-        let mut remote = original.clone();
-        remote.get_mut(&task).unwrap().props["nt"] = note("A remote note");
-        remote.get_mut(&task).unwrap().props["md"] = json!(456.0);
-        let pending = Pending {
-            changes: json!({task.clone():{"e":"Task6","t":1,"p":{"tt":"After","md":123.0}}}),
-            base: original.into_iter().map(|(k, v)| (k, Some(v))).collect(),
-            status: "queued".into(),
-        };
-        assert!(!conflicts(&pending, &remote));
-        remote.get_mut(&task).unwrap().props["tt"] = json!("Someone else");
-        assert!(conflicts(&pending, &remote));
-        remote.remove(&task);
-        assert!(conflicts(&pending, &remote));
     }
     #[test]
     fn unknown_mutation_fields_and_invalid_note_crc_are_rejected() {

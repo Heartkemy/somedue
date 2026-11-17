@@ -633,9 +633,7 @@ impl Cloud {
             .pull(email, password, Some(snapshot))
             .await
             .map_err(|e| CommitError::new(CommitDisposition::Retryable, e))?;
-        // If the same properties changed remotely since editing began, preserve the draft and stop.
-        check_conflicts(snapshot, &current, &changes)
-            .map_err(|e| CommitError::new(CommitDisposition::Review, e))?;
+        // Apply only local intent to the latest Cloud state; unrelated fields stay remote.
         let mut candidate = validate_write(&current, &changes)
             .map_err(|e| CommitError::new(CommitDisposition::Review, e))?;
         let next = current.head.checked_add(1).ok_or_else(|| {
@@ -730,40 +728,6 @@ fn contains_commit(events: &[Value], changes: &Value) -> bool {
                 .all(|(id, event)| map.get(id) == Some(event))
         })
     })
-}
-fn check_conflicts(before: &Snapshot, current: &Snapshot, changes: &Value) -> Result<(), String> {
-    let changes = changes
-        .as_object()
-        .ok_or_else(|| err("changes must be an object"))?;
-    for (id, event) in changes {
-        let action = event.get("t").and_then(Value::as_u64);
-        if action == Some(0) {
-            continue;
-        }
-        let old = before
-            .entities
-            .get(id)
-            .ok_or_else(|| err("edited item no longer exists"))?;
-        let new = current
-            .entities
-            .get(id)
-            .ok_or_else(|| err("item was deleted on another device; draft retained"))?;
-        if action == Some(2) && old != new {
-            return Err(err(
-                "item changed on another device; review before deleting",
-            ));
-        }
-        if let Some(props) = event.get("p").and_then(Value::as_object) {
-            for key in props.keys().filter(|k| k.as_str() != "md") {
-                if old.props.get(key) != new.props.get(key) {
-                    return Err(err(
-                        "this field changed on another device; sync and review your draft",
-                    ));
-                }
-            }
-        }
-    }
-    Ok(())
 }
 fn ids<'a>(e: &'a Entity, key: &str) -> impl Iterator<Item = &'a str> {
     e.props
@@ -982,9 +946,8 @@ pub(crate) fn validate_write(current: &Snapshot, changes: &Value) -> Result<Snap
                 {
                     return Err(err("invalid destination type"));
                 }
-                if matches!(field, "pr" | "agr" | "ts")
-                    // Editing an existing checklist may echo its now-completed parent.
-                    && !(field == "ts" && current.entities.get(id).is_some_and(|old| old.props.get(field) == e.props.get(field)))
+                // Checklists remain editable when their task is completed or cancelled.
+                if matches!(field, "pr" | "agr")
                     && !active_ancestors(&candidate, target, &mut BTreeSet::new())
                 {
                     return Err(err("destination is inactive or contains a cycle"));
@@ -1475,7 +1438,7 @@ mod tests {
         assert!(apply_batch(&mut s, &batch(&new_id(), json!({"e":"Task6","t":7,"p":{}}))).is_err());
     }
     #[test]
-    fn checklist_edit_can_retain_its_completed_parent() {
+    fn checklists_can_be_created_and_edited_under_completed_tasks() {
         let id = new_id();
         let mut s = snapshot(&id);
         s.entities.get_mut(&id).unwrap().props["ss"] = json!(3);
@@ -1497,9 +1460,7 @@ mod tests {
             &new_id(),
             json!({"e":"ChecklistItem3","t":0,"p":{"tt":"New step","ts":[id],"ss":0}}),
         );
-        assert!(validate_write(&s, &create)
-            .unwrap_err()
-            .contains("inactive"));
+        assert!(validate_write(&s, &create).is_ok());
     }
     #[test]
     fn writes_validate_destinations_dates_and_notes() {
@@ -1637,17 +1598,6 @@ mod tests {
         let s = validate_write(&Snapshot::default(), &Value::Object(changes)).unwrap();
         assert_eq!(s.entities.len(), 2);
         assert_eq!(s.entities[&instance].props["rt"][0], template);
-    }
-    #[test]
-    fn conflict_detection_allows_unrelated_remote_edits() {
-        let id = new_id();
-        let old = snapshot(&id);
-        let mut new = old.clone();
-        new.entities.get_mut(&id).unwrap().props["nt"] = note("Remote note");
-        let edit = batch(&id, json!({"e":"Task6","t":1,"p":{"tt":"Local title"}}));
-        assert!(check_conflicts(&old, &new, &edit).is_ok());
-        new.entities.get_mut(&id).unwrap().props["tt"] = json!("Remote title");
-        assert!(check_conflicts(&old, &new, &edit).is_err());
     }
     #[tokio::test]
     async fn connection_progress_reports_actual_transfer_and_item_count_without_content() {
@@ -1841,14 +1791,20 @@ mod tests {
         assert!(fake.finish().iter().all(|r| !r.line.starts_with("POST")));
     }
     #[tokio::test]
-    async fn confirmed_commit_applies_without_post_commit_read() {
+    async fn confirmed_commit_merges_fresh_cloud_fields_without_post_commit_read() {
         let id = new_id();
         let s = snapshot(&id);
         let changes = batch(&id, json!({"e":"Task6","t":1,"p":{"tt":"Saved"}}));
         let fake = Fake::json(vec![
             verified(),
-            page(0, vec![]),
-            json!({"server-head-index":1}),
+            page(
+                1,
+                vec![batch(
+                    &id,
+                    json!({"e":"Task6","t":1,"p":{"tt":"Remote title","nt":note("Remote note")}}),
+                )],
+            ),
+            json!({"server-head-index":2}),
         ]);
         let result = fake
             .client()
@@ -1860,12 +1816,13 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(result.head, 1);
+        assert_eq!(result.head, 2);
         assert_eq!(result.entities[&id].props["tt"], "Saved");
+        assert_eq!(result.entities[&id].props["nt"], note("Remote note"));
         let requests = fake.finish();
         assert_eq!(requests.len(), 3);
         assert_eq!(requests[2].body, changes);
-        assert!(requests[2].line.contains("ancestor-index=0&_cnt=1"));
+        assert!(requests[2].line.contains("ancestor-index=1&_cnt=1"));
         assert!(requests[2].headers.to_lowercase().contains("schema: 301"));
     }
     #[tokio::test]
