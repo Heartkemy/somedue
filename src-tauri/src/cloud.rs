@@ -983,6 +983,8 @@ pub(crate) fn validate_write(current: &Snapshot, changes: &Value) -> Result<Snap
                     return Err(err("invalid destination type"));
                 }
                 if matches!(field, "pr" | "agr" | "ts")
+                    // Editing an existing checklist may echo its now-completed parent.
+                    && !(field == "ts" && current.entities.get(id).is_some_and(|old| old.props.get(field) == e.props.get(field)))
                     && !active_ancestors(&candidate, target, &mut BTreeSet::new())
                 {
                     return Err(err("destination is inactive or contains a cycle"));
@@ -1471,6 +1473,33 @@ mod tests {
             );
         }
         assert!(apply_batch(&mut s, &batch(&new_id(), json!({"e":"Task6","t":7,"p":{}}))).is_err());
+    }
+    #[test]
+    fn checklist_edit_can_retain_its_completed_parent() {
+        let id = new_id();
+        let mut s = snapshot(&id);
+        s.entities.get_mut(&id).unwrap().props["ss"] = json!(3);
+        let check = new_id();
+        apply_batch(
+            &mut s,
+            &batch(
+                &check,
+                json!({"e":"ChecklistItem3","t":0,"p":{"tt":"Step","ts":[id],"ss":0}}),
+            ),
+        )
+        .unwrap();
+        let edit = batch(
+            &check,
+            json!({"e":"ChecklistItem3","t":1,"p":{"tt":"Edited step","ts":[id],"ss":3}}),
+        );
+        assert!(validate_write(&s, &edit).is_ok());
+        let create = batch(
+            &new_id(),
+            json!({"e":"ChecklistItem3","t":0,"p":{"tt":"New step","ts":[id],"ss":0}}),
+        );
+        assert!(validate_write(&s, &create)
+            .unwrap_err()
+            .contains("inactive"));
     }
     #[test]
     fn writes_validate_destinations_dates_and_notes() {
